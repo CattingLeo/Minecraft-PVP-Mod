@@ -5,5 +5,6 @@
 	"key.nocooldown.toggle_instant_use": "Toggle Instant Use",
 	"key.nocooldown.toggle_no_damage": "Toggle No Damage",
 	"key.nocooldown.toggle_flight": "Toggle Flight",
-	"key.nocooldown.toggle_hunger": "Toggle Infinite Hunger"
+	"key.nocooldown.toggle_hunger": "Toggle Infinite Hunger",
+	"key.nocooldown.toggle_kill_aura": "Toggle Kill Aura"
 }

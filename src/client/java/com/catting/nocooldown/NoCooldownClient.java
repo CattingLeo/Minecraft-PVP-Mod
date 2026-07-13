@@ -5,6 +5,11 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
 
 @Environment(EnvType.CLIENT)
 public class NoCooldownClient implements ClientModInitializer {
@@ -19,6 +24,7 @@ public class NoCooldownClient implements ClientModInitializer {
         NoCooldownKeybinds.register();
         ClientTickEvents.END_CLIENT_TICK.register(NoCooldownClient::updateFlight);
         ClientTickEvents.END_CLIENT_TICK.register(NoCooldownClient::updateHunger);
+        ClientTickEvents.END_CLIENT_TICK.register(NoCooldownClient::updateKillAura);
     }
 
     /**
@@ -57,5 +63,51 @@ public class NoCooldownClient implements ClientModInitializer {
         var food = mc.player.getFoodData();
         if (food.getFoodLevel() < 20) food.setFoodLevel(20);
         if (food.getSaturationLevel() < 20.0f) food.setSaturation(20.0f);
+    }
+
+    /**
+     * Kill Aura: attacks the nearest valid target in range, but only when the
+     * attack meter is fully charged (so every swing is a full-strength vanilla
+     * hit -- no packet spam) and only with genuine line of sight (never through
+     * walls). Uses the same MultiPlayerGameMode#attack path a real click takes.
+     *
+     * NOTE: unlike the other sandbox toggles on this page, attacking is
+     * client-initiated, so this one DOES work on servers you don't host --
+     * which is exactly why it must stay a private-world / LAN-with-friends
+     * toggle. See the Fair use section in README.md.
+     */
+    private static void updateKillAura(Minecraft mc) {
+        NoCooldownConfig c = NoCooldownConfig.get();
+        if (!c.killAura || mc.player == null || mc.level == null || mc.gameMode == null) return;
+        // Mouse grabbed == actively playing with no GUI/chat open (and window
+        // focused) -- Minecraft no longer exposes the current screen directly.
+        if (!mc.mouseHandler.isMouseGrabbed() || mc.player.isSpectator() || !mc.player.isAlive()) return;
+        if (mc.player.getAttackStrengthScale(0.0f) < 1.0f) return;
+
+        double range = c.killAuraRange;
+        LivingEntity target = null;
+        double best = range * range;
+        for (LivingEntity e : mc.level.getEntitiesOfClass(LivingEntity.class,
+                mc.player.getBoundingBox().inflate(range), e -> isKillAuraTarget(mc, e))) {
+            double d = mc.player.distanceToSqr(e);
+            if (d <= best) {
+                best = d;
+                target = e;
+            }
+        }
+        if (target != null) {
+            mc.gameMode.attack(mc.player, target);
+            mc.player.swing(InteractionHand.MAIN_HAND);
+        }
+    }
+
+    private static boolean isKillAuraTarget(Minecraft mc, LivingEntity e) {
+        if (e == mc.player || !e.isAlive()) return false;
+        boolean typeOk = switch (NoCooldownConfig.get().killAuraTargets) {
+            case PLAYERS -> e instanceof Player p && !p.isSpectator();
+            case HOSTILE_MOBS -> e instanceof Enemy;
+            case ALL_MOBS -> e instanceof Enemy || (e instanceof Mob) || (e instanceof Player p && !p.isSpectator());
+        };
+        return typeOk && mc.player.hasLineOfSight(e);
     }
 }

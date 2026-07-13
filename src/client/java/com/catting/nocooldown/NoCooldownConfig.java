@@ -33,6 +33,24 @@ public class NoCooldownConfig {
         }
     }
 
+    /** Who Kill Aura is allowed to swing at. */
+    public enum KillAuraTargets {
+        PLAYERS("Players"),
+        HOSTILE_MOBS("Hostile mobs"),
+        ALL_MOBS("All mobs + players");
+
+        public final String label;
+
+        KillAuraTargets(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     public Mode mode = Mode.DISABLED;
 
     // --- Extras (independent toggles, not part of the mode cycle) ---
@@ -41,6 +59,9 @@ public class NoCooldownConfig {
     public boolean noDamage = false;
     public boolean flightEnabled = false;
     public boolean infiniteHunger = false;
+    public boolean killAura = false;
+    public int killAuraRange = 3;
+    public KillAuraTargets killAuraTargets = KillAuraTargets.PLAYERS;
 
     // ------------------------------------------------------------------
 
@@ -71,6 +92,9 @@ public class NoCooldownConfig {
         }
         if (instance.mode == null) {
             instance.mode = Mode.DISABLED;
+        }
+        if (instance.killAuraTargets == null) {
+            instance.killAuraTargets = KillAuraTargets.PLAYERS;
         }
     }
 

@@ -82,6 +82,7 @@ Independent sandbox toggles, plus the original three-way cooldown-removal mode:
 | **No Damage** | Full invincibility |
 | **Flight** | Creative-style flight without switching game mode |
 | **Infinite Hunger** | Food and saturation stay pinned at full |
+| **Kill Aura** | Auto-attacks the nearest valid target in range (configurable range and target type: players / hostile mobs / all) — only swings on a fully charged attack meter and only with real line of sight |
 | **All Off** | One-click reset for everything on this page |
 
 ## Fair use
@@ -98,6 +99,11 @@ This mod's design draws a hard line between two categories:
   nothing meaningful on a server you don't host, and using them against people who
   haven't agreed to it is exactly what anti-cheat systems exist to catch. Use this page
   in your own worlds, not on a competitive server.
+- **Kill Aura deserves an extra-bold warning**: attacking is client-initiated, so unlike
+  the rest of the No Cooldown page it **does** work on servers you don't host. Using it
+  against people who haven't agreed to it is plain cheating and a fast ban on any
+  moderated server. It exists here for the same reason the rest of the sandbox page
+  does — private worlds and LAN games where everyone's in on it.
 
 ## Keybinds
 
@@ -111,7 +117,8 @@ Explosion Removal, Totem Corner Pop, HUD, Clean View; plus **Screenshot** and
 `ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt yuv420p out.mp4`, or use
 OBS Studio for real-time recording).
 
-**No Cooldown**: Cycle Mode, and a toggle for each of the five Extras above.
+**No Cooldown**: Cycle Mode, and a toggle for each of the six Extras above (including
+Kill Aura).
 
 ## License
 

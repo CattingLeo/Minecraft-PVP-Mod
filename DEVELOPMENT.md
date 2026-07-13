@@ -27,6 +27,17 @@ does nothing meaningful (and would be rule-breaking) on a public server.
   Turning it off only revokes flight this mod granted.
 - **Infinite Hunger** — food/saturation pinned at full (`FoodData#addExhaustion`
   cancelled at its single accumulation point, topped up each tick).
+- **Kill Aura** — no mixin; a client tick handler that calls
+  `MultiPlayerGameMode#attack` + `LocalPlayer#swing`, the same path a real click
+  takes. Gated on `Player#getAttackStrengthScale >= 1` (every swing is a
+  full-strength hit, one attack per charge — no packet spam), a genuine
+  `LivingEntity#hasLineOfSight` raycast (never through walls), no open screen, and
+  not Spectator. Nearest-target selection via `Level#getEntitiesOfClass` over the
+  player AABB inflated by the configured range (2–6 blocks, distance-squared
+  compared against range²). Target filter: players (excl. Spectators) / `Enemy`
+  hostiles / all mobs + players. NOTE: attacks are client-initiated, so unlike the
+  rest of this page it DOES affect servers you don't host — see Fair use in
+  README.md.
 - **All Off** — a checkbox that always shows unchecked; check it and hit Save to
   reset every No Cooldown toggle above back to off in one click.
 
@@ -110,5 +121,5 @@ For real-time, reliable recording, **OBS Studio** (free) remains the better tool
 this is a lightweight fallback, not a replacement for it.
 
 **No Cooldown** section: Cycle Mode, Toggle Unlimited Durability, Toggle Instant Use,
-Toggle No Damage, Toggle Flight, Toggle Infinite Hunger. (No keybind for "All Off" --
+Toggle No Damage, Toggle Flight, Toggle Infinite Hunger, Toggle Kill Aura. (No keybind for "All Off" --
 that's a Mod Menu-only action, since it's designed as a checkbox-then-Save reset.)

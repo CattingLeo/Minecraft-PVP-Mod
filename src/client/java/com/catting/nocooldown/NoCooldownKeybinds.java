@@ -30,6 +30,7 @@ public final class NoCooldownKeybinds {
     private static final KeyMapping TOGGLE_NO_DAMAGE = bind("toggle_no_damage");
     private static final KeyMapping TOGGLE_FLIGHT = bind("toggle_flight");
     private static final KeyMapping TOGGLE_HUNGER = bind("toggle_hunger");
+    private static final KeyMapping TOGGLE_KILL_AURA = bind("toggle_kill_aura");
 
     private NoCooldownKeybinds() {
     }
@@ -50,6 +51,7 @@ public final class NoCooldownKeybinds {
         while (TOGGLE_NO_DAMAGE.consumeClick()) toggle(c -> c.noDamage = !c.noDamage);
         while (TOGGLE_FLIGHT.consumeClick()) toggle(c -> c.flightEnabled = !c.flightEnabled);
         while (TOGGLE_HUNGER.consumeClick()) toggle(c -> c.infiniteHunger = !c.infiniteHunger);
+        while (TOGGLE_KILL_AURA.consumeClick()) toggle(c -> c.killAura = !c.killAura);
     }
 
     private interface ConfigEdit {

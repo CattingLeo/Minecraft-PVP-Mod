@@ -117,6 +117,20 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(false).setSaveConsumer(v -> nc.flightEnabled = v).build());
             noCooldown.addEntry(e.startBooleanToggle(Component.literal("Infinite Hunger"), nc.infiniteHunger)
                     .setDefaultValue(false).setSaveConsumer(v -> nc.infiniteHunger = v).build());
+            noCooldown.addEntry(e.startBooleanToggle(Component.literal("Kill Aura"), nc.killAura)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal(
+                            "Auto-attacks the nearest valid target once your attack meter is full "
+                            + "(full-strength vanilla hits, line of sight required). Unlike the other "
+                            + "toggles here, attacks are client-initiated and DO work on servers you "
+                            + "don't host -- keep this to private worlds / LAN with friends."))
+                    .setSaveConsumer(v -> nc.killAura = v).build());
+            noCooldown.addEntry(e.startIntSlider(Component.literal("Kill Aura range (blocks)"), nc.killAuraRange, 2, 6)
+                    .setDefaultValue(3).setSaveConsumer(v -> nc.killAuraRange = v).build());
+            noCooldown.addEntry(e.startEnumSelector(Component.literal("Kill Aura targets"),
+                            NoCooldownConfig.KillAuraTargets.class, nc.killAuraTargets)
+                    .setDefaultValue(NoCooldownConfig.KillAuraTargets.PLAYERS)
+                    .setSaveConsumer(v -> nc.killAuraTargets = v).build());
             // "All Off" button. Cloth Config has no plain action-button widget, so this
             // is a toggle that always displays unchecked (its default is never read
             // from persisted state) and, if checked when you save, resets everything
@@ -132,6 +146,7 @@ public class PvpKitModMenu implements ModMenuApi {
                             nc.noDamage = false;
                             nc.flightEnabled = false;
                             nc.infiniteHunger = false;
+                            nc.killAura = false;
                         }
                     }).build());
 
