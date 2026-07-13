@@ -75,6 +75,36 @@ does nothing meaningful (and would be rule-breaking) on a public server.
 - **Hit marker** — white corner brackets flash around the crosshair when your attack swing lands
   (`Player#attack`), visually distinct from the red cooldown flash.
 
+## Utility page
+- **Auto Totem** — no mixin; a client tick handler that, if offhand isn't already a
+  totem and one exists anywhere in the hotbar/main inventory (`Inventory#getItem(0..35)`),
+  performs the same 3-click sequence a real player performs dragging one stack onto
+  another with no inventory screen required: `MultiPlayerGameMode#handleContainerInput`
+  with `ContainerInput.PICKUP` on the totem's slot, then on offhand (menu slot 45), then
+  back on the original slot. Uses the standard `InventoryMenu` slot numbering (9–35 main
+  storage, 36–44 hotbar, 45 offhand) — protocol-stable since offhand was added, but
+  flagged here as the one spot in this feature that's inferred rather than confirmed
+  against actual `InventoryMenu` source, so re-verify if it ever seems to grab the wrong
+  slot.
+- **Auto Eat** — below the configured hunger threshold (`FoodData#getFoodLevel`),
+  switches the selected hotbar slot to the first item with a `DataComponents.FOOD`
+  component (sending `ServerboundSetCarriedItemPacket` to keep the server in sync) and
+  calls `MultiPlayerGameMode#useItem` every tick — the same call a real held right-click
+  drives — until hunger recovers. Hotbar-only by design (reaching into the backpack would
+  need the same slot-swap machinery as Auto Totem, and both would fight over the offhand
+  slot), and doesn't restore your previous hotbar slot afterward (switching mid-bite would
+  cancel the bite, same as it would for a human).
+- **Criticals** — rather than spoofing the server-computed fall-distance crit check (a real
+  server computes that itself from your synced position, so a purely client-side flag
+  wouldn't actually apply), this keeps you perpetually hopping while on the ground via
+  `LivingEntity#jumpFromGround` — the same call Space itself triggers — so every attack
+  naturally lands mid-air. Automates a completely legal, commonly hand-timed technique;
+  doesn't touch damage values.
+- **Module HUD** — a Meteor Client-style vertical list of this mod's own toggles that are
+  currently on, top-right corner. Purely a status readout (reads `PvpKitClient`'s live
+  flags + `NoCooldownConfig.get()`); doesn't do anything by itself. The only keybind in
+  this mod bound by default (Right Shift) rather than shipping unbound.
+
 All of the above are toggled from the Mod Menu config screen, not by editing code.
 
 ## Build
@@ -101,7 +131,9 @@ Every key starts UNBOUND; nothing fires until you set one.
 
 **PVP** section: Fullbright, Locator Arrow, Hit Marker, Cooldown Flash,
 Crystal-Only Explosion Removal, Totem Corner Pop, HUD, Clean View (bundles
-slowness FOV/nausea/hurt tilt/darkness/blindness). Plus:
+slowness FOV/nausea/hurt tilt/darkness/blindness), Auto Totem, Auto Eat, Criticals,
+Module HUD (bound to Right Shift by default — every other keybind here starts unbound).
+Plus:
 - **Screenshot** -- captures your primary monitor to `files/screenshots/`.
 - **Start/Stop Recording** -- captures ~10 frames/sec to `files/screen recording/<timestamp>/`
   as a PNG sequence while toggled on.

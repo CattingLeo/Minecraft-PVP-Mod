@@ -93,6 +93,27 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setTooltip(Component.literal("Uses vanilla's glow outline (same as Spectator highlight), visible through walls while the target is hidden."))
                     .setSaveConsumer(v -> c.locatorShowThroughWalls = v).build());
 
+            // ---------------- Utility ----------------
+            ConfigCategory utility = b.getOrCreateCategory(Component.literal("Utility"));
+            utility.addEntry(e.startBooleanToggle(Component.literal("Auto Totem"), c.autoTotem)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal("Keeps a totem in your offhand whenever one is elsewhere in your inventory."))
+                    .setSaveConsumer(v -> c.autoTotem = v).build());
+            utility.addEntry(e.startBooleanToggle(Component.literal("Auto Eat"), c.autoEat)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal("Switches to hotbar food and eats it once hunger drops below the threshold below."))
+                    .setSaveConsumer(v -> c.autoEat = v).build());
+            utility.addEntry(e.startIntSlider(Component.literal("Auto Eat hunger threshold"), c.autoEatHungerThreshold, 0, 19)
+                    .setDefaultValue(14).setSaveConsumer(v -> c.autoEatHungerThreshold = v).build());
+            utility.addEntry(e.startBooleanToggle(Component.literal("Criticals (auto bunny-hop)"), c.criticals)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal("Keeps you hopping while on the ground so every hit lands while airborne -- the same legal timing good PvP players already use, just automated."))
+                    .setSaveConsumer(v -> c.criticals = v).build());
+            utility.addEntry(e.startBooleanToggle(Component.literal("Module HUD (Right Shift)"), c.moduleHud)
+                    .setDefaultValue(true)
+                    .setTooltip(Component.literal("Top-right list naming whichever toggles from this mod are currently on."))
+                    .setSaveConsumer(v -> c.moduleHud = v).build());
+
             // ---------------- No Cooldown ----------------
             // Private-world / LAN-with-friends sandbox toggles. Effective in worlds
             // you host; damage/durability/flight are server-authoritative elsewhere,

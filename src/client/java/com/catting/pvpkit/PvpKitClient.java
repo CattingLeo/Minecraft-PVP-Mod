@@ -4,6 +4,8 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.catting.nocooldown.NoCooldownConfig;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -15,13 +17,19 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -63,6 +71,13 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean COOLDOWN_FLASH = true;
     public static boolean SHOW_HIT_MARKER = true;
 
+    // ---- Utility (Auto Totem / Auto Eat / Criticals / module HUD) ----
+    public static boolean AUTO_TOTEM = false;
+    public static boolean AUTO_EAT = false;
+    public static int AUTO_EAT_HUNGER_THRESHOLD = 14;
+    public static boolean CRITICALS = false;
+    public static boolean MODULE_HUD = true;
+
     /** Copy persisted config -> live flags. Called on load and on config save. */
     public static void applyConfig() {
         PvpKitConfig c = PvpKitConfig.get();
@@ -78,6 +93,8 @@ public class PvpKitClient implements ClientModInitializer {
         LOCATOR_SHOW_THROUGH_WALLS = c.locatorShowThroughWalls;
         NO_CRYSTAL_EXPLOSION = c.noCrystalExplosion; COOLDOWN_FLASH = c.cooldownFlash;
         SHOW_HIT_MARKER = c.showHitMarker;
+        AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
+        CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
     }
 
     // ---- Totem corner pop ----
@@ -201,6 +218,99 @@ public class PvpKitClient implements ClientModInitializer {
             if (prevCooldown && !nowCd) cooldownFlashStart = System.currentTimeMillis();
             prevCooldown = nowCd;
         }
+
+        if (CRITICALS) updateCriticals(mc);
+        if (AUTO_TOTEM) updateAutoTotem(mc);
+        if (AUTO_EAT) updateAutoEat(mc);
+    }
+
+    /**
+     * Auto-crit: rather than faking the server-validated fall-distance check
+     * (which a real server computes itself from your synced position, so a
+     * purely client-side "pretend I fell" flag wouldn't actually apply),
+     * this just keeps you continuously hopping while on the ground -- the
+     * same legal, entirely-manual "bunny hop" technique good PvP players
+     * already use to crit every hit, just automated so you don't have to
+     * time it yourself. `LivingEntity#jumpFromGround` is the exact call the
+     * space bar itself triggers.
+     */
+    private void updateCriticals(Minecraft mc) {
+        if (mc.player == null || !mc.player.onGround() || mc.player.isPassenger()) return;
+        mc.player.jumpFromGround();
+    }
+
+    /**
+     * Auto Totem: keeps your offhand topped up with a totem whenever one is
+     * anywhere else in your inventory. Implemented as the same 3-click
+     * pickup/place/pickup sequence a real player performs when dragging one
+     * item onto another in the inventory screen -- PICKUP the totem stack
+     * (onto the cursor), PICKUP the offhand slot (places the totem, cursor
+     * now holds whatever was in offhand), PICKUP the original slot again
+     * (places that back where the totem was). No inventory screen needs to
+     * be open for handleContainerInput to accept these.
+     *
+     * Slot numbers use the standard InventoryMenu layout (protocol-stable
+     * since item offhand was added): 9-35 main storage, 36-44 hotbar, 45
+     * offhand. Runs at most once per tick and only once offhand actually
+     * needs it, so it doesn't fight a real player's own inventory clicks.
+     */
+    private static final int MENU_SLOT_OFFHAND = 45;
+
+    private void updateAutoTotem(Minecraft mc) {
+        if (mc.player == null || mc.gameMode == null || mc.getConnection() == null) return;
+        if (!mc.mouseHandler.isMouseGrabbed()) return; // don't fight an open inventory/GUI
+        if (mc.player.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) return;
+
+        var inv = mc.player.getInventory();
+        int found = -1;
+        for (int i = 0; i < 36; i++) {
+            if (inv.getItem(i).is(Items.TOTEM_OF_UNDYING)) {
+                found = i;
+                break;
+            }
+        }
+        if (found < 0) return;
+
+        int menuSlot = found < 9 ? 36 + found : found;
+        int containerId = mc.player.inventoryMenu.containerId;
+        mc.gameMode.handleContainerInput(containerId, menuSlot, 0, ContainerInput.PICKUP, mc.player);
+        mc.gameMode.handleContainerInput(containerId, MENU_SLOT_OFFHAND, 0, ContainerInput.PICKUP, mc.player);
+        mc.gameMode.handleContainerInput(containerId, menuSlot, 0, ContainerInput.PICKUP, mc.player);
+    }
+
+    /**
+     * Auto Eat: below the configured hunger threshold, switches to the first
+     * food item found in the hotbar and holds "use" on it every tick (the
+     * same call a real held-right-click drives) until hunger recovers or the
+     * food runs out. Deliberately hotbar-only -- reaching into the backpack
+     * for food would need the same slot-swap machinery as Auto Totem, and
+     * competing with Auto Totem for the offhand slot -- so keep a food item
+     * on your hotbar for this to help. Does not restore your previous
+     * hotbar selection afterward (switching slots mid-bite cancels the
+     * bite), same as a real player choosing to swap by hand.
+     */
+    private void updateAutoEat(Minecraft mc) {
+        if (mc.player == null || mc.gameMode == null || mc.getConnection() == null) return;
+        if (!mc.mouseHandler.isMouseGrabbed()) return;
+        if (mc.player.isUsingItem()) return;
+        if (mc.player.getFoodData().getFoodLevel() >= AUTO_EAT_HUNGER_THRESHOLD) return;
+
+        var inv = mc.player.getInventory();
+        int foodSlot = -1;
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = inv.getItem(i);
+            if (!stack.isEmpty() && stack.has(DataComponents.FOOD)) {
+                foodSlot = i;
+                break;
+            }
+        }
+        if (foodSlot < 0) return;
+
+        if (inv.getSelectedSlot() != foodSlot) {
+            inv.setSelectedSlot(foodSlot);
+            mc.getConnection().getConnection().send(new ServerboundSetCarriedItemPacket(foodSlot));
+        }
+        mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
     }
 
     // ---- Toast messages (used by keybind actions like screenshot/recording) ----
@@ -272,6 +382,42 @@ public class PvpKitClient implements ClientModInitializer {
         }
 
         if (TOTEM_POP) renderTotemPop(graphics, w, h);
+        if (MODULE_HUD) renderModuleHud(graphics, mc, w);
+    }
+
+    /**
+     * A Meteor Client-style "module list" -- a vertical, right-aligned list
+     * naming whichever toggles from this mod are currently ON, top-right
+     * corner. Purely a status readout of this mod's OWN existing settings
+     * (nothing here does anything by itself); toggle with Right Shift
+     * (Options -> Controls -> Key Binds -> PvP Kit -> "Toggle Module HUD").
+     */
+    private void renderModuleHud(GuiGraphicsExtractor g, Minecraft mc, int screenW) {
+        NoCooldownConfig nc = NoCooldownConfig.get();
+        java.util.List<String> active = new java.util.ArrayList<>();
+        if (FULLBRIGHT) active.add("Fullbright");
+        if (LOCATOR_ENABLED) active.add("Locator");
+        if (COOLDOWN_FLASH) active.add("Cooldown Flash");
+        if (AUTO_TOTEM) active.add("Auto Totem");
+        if (AUTO_EAT) active.add("Auto Eat");
+        if (CRITICALS) active.add("Criticals");
+        if (nc.mode != NoCooldownConfig.Mode.DISABLED) active.add(nc.mode.label);
+        if (nc.unlimitedDurability) active.add("Unlimited Durability");
+        if (nc.instantUse) active.add("Instant Use");
+        if (nc.noDamage) active.add("No Damage");
+        if (nc.flightEnabled) active.add("Flight");
+        if (nc.infiniteHunger) active.add("Infinite Hunger");
+        if (nc.killAura) active.add("Kill Aura");
+        if (active.isEmpty()) return;
+
+        int y = 4;
+        for (String name : active) {
+            int tw = mc.font.width(name);
+            int x = screenW - tw - 6;
+            g.fill(x - 3, y - 1, screenW - 2, y + 9, 0x60000000);
+            g.text(mc.font, name, x, y, 0xFFE8B84B, true);
+            y += 11;
+        }
     }
 
     /** Reads the tab-list latency for the local player. Long-standing, stable vanilla API. */

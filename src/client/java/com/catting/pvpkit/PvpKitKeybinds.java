@@ -64,6 +64,13 @@ public final class PvpKitKeybinds {
     private static final KeyMapping TOGGLE_CLEAN_VIEW = bind("toggle_clean_view");
     private static final KeyMapping SCREENSHOT = bind("screenshot");
     private static final KeyMapping TOGGLE_RECORDING = bind("toggle_recording");
+    private static final KeyMapping TOGGLE_AUTO_TOTEM = bind("toggle_auto_totem");
+    private static final KeyMapping TOGGLE_AUTO_EAT = bind("toggle_auto_eat");
+    private static final KeyMapping TOGGLE_CRITICALS = bind("toggle_criticals");
+    // Deliberately bound by default (every other keybind in this mod starts
+    // unbound) -- this one was specifically requested as a Right Shift toggle.
+    private static final KeyMapping TOGGLE_MODULE_HUD = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+            "key.pvpkit.toggle_module_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, CATEGORY));
 
     private static Robot robot;
     private static boolean recording = false;
@@ -123,6 +130,10 @@ public final class PvpKitKeybinds {
         });
         while (SCREENSHOT.consumeClick()) takeScreenshot(mc);
         while (TOGGLE_RECORDING.consumeClick()) toggleRecording(mc);
+        while (TOGGLE_AUTO_TOTEM.consumeClick()) toggle(c -> c.autoTotem = !c.autoTotem);
+        while (TOGGLE_AUTO_EAT.consumeClick()) toggle(c -> c.autoEat = !c.autoEat);
+        while (TOGGLE_CRITICALS.consumeClick()) toggle(c -> c.criticals = !c.criticals);
+        while (TOGGLE_MODULE_HUD.consumeClick()) toggle(c -> c.moduleHud = !c.moduleHud);
 
         if (recording) {
             long now = System.currentTimeMillis();

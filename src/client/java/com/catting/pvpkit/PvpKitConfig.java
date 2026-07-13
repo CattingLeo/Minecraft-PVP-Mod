@@ -54,6 +54,13 @@ public class PvpKitConfig {
     public boolean cooldownFlash = true;
     public boolean showHitMarker = true;
 
+    // --- Utility (see PvpKitClient javadoc for how each one works) ---
+    public boolean autoTotem = false;
+    public boolean autoEat = false;
+    public int autoEatHungerThreshold = 14;
+    public boolean criticals = false;
+    public boolean moduleHud = true;
+
     // ------------------------------------------------------------------
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static PvpKitConfig instance;

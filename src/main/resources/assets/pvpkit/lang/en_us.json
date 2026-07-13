@@ -9,5 +9,9 @@
 	"key.pvpkit.toggle_hud": "Toggle HUD (FPS/CPS)",
 	"key.pvpkit.toggle_clean_view": "Toggle Clean View",
 	"key.pvpkit.screenshot": "Screenshot",
-	"key.pvpkit.toggle_recording": "Start/Stop Recording"
+	"key.pvpkit.toggle_recording": "Start/Stop Recording",
+	"key.pvpkit.toggle_auto_totem": "Toggle Auto Totem",
+	"key.pvpkit.toggle_auto_eat": "Toggle Auto Eat",
+	"key.pvpkit.toggle_criticals": "Toggle Criticals",
+	"key.pvpkit.toggle_module_hud": "Toggle Module HUD"
 }

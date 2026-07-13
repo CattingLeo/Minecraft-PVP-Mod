@@ -37,7 +37,7 @@ The finished jar lands in `build/libs/` — take the one **without** the `-sourc
 
 ## Features
 
-Configured entirely from **Mod Menu → PVP**, across six pages:
+Configured entirely from **Mod Menu → PVP**, across seven pages:
 
 ### HUD
 FPS, CPS, and Ping — all rainbow-cycling text, positioned bottom-left to stay clear of
@@ -70,6 +70,14 @@ A fancy arrow slides along the screen edge, pointing toward your nearest other p
 with a live distance readout. Hides automatically once you have genuine line of sight
 (a real raycast, not just a facing check) or they're within your rough FOV. Off by
 default. See [Fair use](#fair-use).
+
+### Utility
+| Toggle | Effect |
+|---|---|
+| **Auto Totem** | Keeps a totem in your offhand any time one exists elsewhere in your inventory |
+| **Auto Eat** | Switches to hotbar food and eats once hunger drops below a configurable threshold |
+| **Criticals** | Keeps you hopping while on the ground so every hit lands while airborne — automates the same legal bunny-hop timing good PvP players already use manually, doesn't fake anything server-side |
+| **Module HUD** | Top-right list naming whichever of this mod's toggles are currently on. Bound to **Right Shift** by default (every other keybind in this mod starts unbound — this one's the deliberate exception) |
 
 ### No Cooldown page
 Independent sandbox toggles, plus the original three-way cooldown-removal mode:
@@ -108,14 +116,15 @@ This mod's design draws a hard line between two categories:
 ## Keybinds
 
 Options → Controls → Key Binds → two sections, **"PVP"** and **"No Cooldown"**. Every
-key ships **unbound** — nothing fires until you set one yourself.
+key ships **unbound** — nothing fires until you set one yourself — **except Toggle
+Module HUD, which ships bound to Right Shift** since that was requested as its default.
 
 **PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
-Explosion Removal, Totem Corner Pop, HUD, Clean View; plus **Screenshot** and
-**Start/Stop Recording** (captures to `files/screenshots/` and
-`files/screen recording/<timestamp>/` as a PNG sequence — turn it into a video with
-`ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt yuv420p out.mp4`, or use
-OBS Studio for real-time recording).
+Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,
+Module HUD (Right Shift); plus **Screenshot** and **Start/Stop Recording** (captures to
+`files/screenshots/` and `files/screen recording/<timestamp>/` as a PNG sequence — turn
+it into a video with `ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt
+yuv420p out.mp4`, or use OBS Studio for real-time recording).
 
 **No Cooldown**: Cycle Mode, and a toggle for each of the six Extras above (including
 Kill Aura).
