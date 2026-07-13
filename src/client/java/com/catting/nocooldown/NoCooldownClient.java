@@ -56,6 +56,6 @@ public class NoCooldownClient implements ClientModInitializer {
         if (mc.player == null || !NoCooldownConfig.get().infiniteHunger) return;
         var food = mc.player.getFoodData();
         if (food.getFoodLevel() < 20) food.setFoodLevel(20);
-        if (food.getSaturationLevel() < 20.0f) food.setSaturationLevel(20.0f);
+        if (food.getSaturationLevel() < 20.0f) food.setSaturation(20.0f);
     }
 }
