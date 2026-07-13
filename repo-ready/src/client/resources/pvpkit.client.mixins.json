@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "com.catting.pvpkit.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"FogMixin",
+		"FovMixin",
+		"TotemMixin",
+		"ExplosionParticleMixin",
+		"GuiMixin",
+		"HitMarkerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

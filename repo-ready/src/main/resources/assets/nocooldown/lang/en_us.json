@@ -1,0 +1,9 @@
+{
+	"key.category.nocooldown.no_cooldown": "No Cooldown",
+	"key.nocooldown.cycle_mode": "Cycle Mode (Disabled/Spear/Everything)",
+	"key.nocooldown.toggle_durability": "Toggle Unlimited Durability",
+	"key.nocooldown.toggle_instant_use": "Toggle Instant Use",
+	"key.nocooldown.toggle_no_damage": "Toggle No Damage",
+	"key.nocooldown.toggle_flight": "Toggle Flight",
+	"key.nocooldown.toggle_hunger": "Toggle Infinite Hunger"
+}

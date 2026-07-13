@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "com.catting.nocooldown.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"AttackStrengthMixin",
+		"ItemCooldownMixin",
+		"DurabilityMixin",
+		"UseDurationMixin",
+		"NoDamageMixin",
+		"HungerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

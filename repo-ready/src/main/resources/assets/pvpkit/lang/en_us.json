@@ -1,0 +1,13 @@
+{
+	"key.category.pvpkit.pvp_kit": "PvP Kit",
+	"key.pvpkit.toggle_fullbright": "Toggle Fullbright",
+	"key.pvpkit.toggle_locator": "Toggle Locator Arrow",
+	"key.pvpkit.toggle_hit_marker": "Toggle Hit Marker",
+	"key.pvpkit.toggle_cooldown_flash": "Toggle Cooldown Flash",
+	"key.pvpkit.toggle_crystal_explosion": "Toggle Crystal-Only Explosion Removal",
+	"key.pvpkit.toggle_totem_pop": "Toggle Totem Corner Pop",
+	"key.pvpkit.toggle_hud": "Toggle HUD (FPS/CPS)",
+	"key.pvpkit.toggle_clean_view": "Toggle Clean View",
+	"key.pvpkit.screenshot": "Screenshot",
+	"key.pvpkit.toggle_recording": "Start/Stop Recording"
+}

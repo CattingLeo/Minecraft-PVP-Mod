@@ -1,0 +1,42 @@
+{
+	"schemaVersion": 1,
+	"id": "pvpkit",
+	"version": "${version}",
+	"name": "PVP",
+	"description": "Client-side PvP toolkit: HUD, totem corner pop, clean-view, crystal-only explosions, hit marker, locator arrow, and a No Cooldown page for private-world sandbox toggles.",
+	"authors": [
+		"Catting"
+	],
+	"license": "CC0-1.0",
+	"icon": "assets/pvpkit/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.catting.pvpkit.PvpKitClient",
+			"com.catting.nocooldown.NoCooldownClient"
+		],
+		"modmenu": [
+			"com.catting.pvpkit.PvpKitModMenu"
+		]
+	},
+	"mixins": [
+		{
+			"config": "pvpkit.client.mixins.json",
+			"environment": "client"
+		},
+		{
+			"config": "nocooldown.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"cloth-config": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}
