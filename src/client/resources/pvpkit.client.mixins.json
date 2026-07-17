@@ -5,7 +5,6 @@
 	"client": [
 		"FogMixin",
 		"FovMixin",
-		"TotemMixin",
 		"ExplosionParticleMixin",
 		"GuiMixin",
 		"HitMarkerMixin"

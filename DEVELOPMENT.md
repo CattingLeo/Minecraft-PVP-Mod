@@ -43,8 +43,10 @@ does nothing meaningful (and would be rule-breaking) on a public server.
 
 ## Features (HUD / Totem / Clean View / Combat / Locator pages)
 - **HUD** — FPS + CPS + Ping (tab-list latency), all **RGB rainbow-cycling** text, bottom-left (clear of Xaero).
-- **Totem corner pop** — small gold pop (configurable corner) on your own totem (event 35); centre
-  animation hidden via `GameRenderer#displayItemActivation`.
+- **Totem corner pop** — small gold pop (configurable corner) on your own totem. Both the pop
+  and the centre-animation hide are driven from `GameRenderer#displayItemActivation`, which in
+  26.2 is called only from `ClientPacketListener#handleEntityEvent`'s totem branch and only for
+  the local player, so it's an exact "our totem popped" signal.
 - **Clean view** — no slowness FOV zoom (keeps speed/sprint/bow-draw, scaled to Slowness level),
   no nausea/portal warp, no hurt tilt, no blindness/darkness fog.
 - **Fullbright** — client-side Night Vision (topped up quietly), so it **works under shaders**
@@ -118,7 +120,10 @@ Jar in `build/libs/` (without `-sources`). Needs Fabric API `0.153.0+26.2`.
 - HUD: `Minecraft#getFps()`, `GuiGraphicsExtractor#text/fill/pose`.
 - Clean view: `Options#screenEffectScale/damageTiltScale`, `AbstractClientPlayer#getFieldOfViewModifier` (FovMixin),
   `MobEffectFogEnvironment#isApplicable` + `getMobEffect()` (FogMixin), `DimensionOrBossFogEnvrionment` (NetherFogMixin, Mojang's typo).
-- Totem: `LivingEntity#handleEntityEvent` + event id `35`; `Gui#displayItemActivation` (centre hide).
+- Totem: `GameRenderer#displayItemActivation` (drives both corner pop + centre hide). NOTE: do NOT
+  use `LivingEntity#handleEntityEvent` byte-event 35 — in 26.2 totem event 35 is intercepted in
+  `ClientPacketListener#handleEntityEvent(ClientboundEntityEventPacket)` and never reaches the
+  entity's byte `handleEntityEvent`, so that route is dead (was the original corner-pop bug).
 - Fullbright: `MobEffects.NIGHT_VISION`, `MobEffectInstance(Holder,int,int,bool,bool,bool)`, `player.addEffect`.
 - Crystal explosion: `ClientLevel#addParticle(ParticleOptions,double x6)` overload, `ParticleTypes.EXPLOSION(_EMITTER)`,
   `ClientEntityEvents.ENTITY_UNLOAD`, `EndCrystal`.
