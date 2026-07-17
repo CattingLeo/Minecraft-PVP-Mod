@@ -116,8 +116,11 @@ This mod's design draws a hard line between two categories:
 ## Keybinds
 
 Options → Controls → Key Binds → two sections, **"PVP"** and **"No Cooldown"**. Every
-key ships **unbound** — nothing fires until you set one yourself — **except Toggle
-Module HUD, which ships bound to Right Shift** since that was requested as its default.
+action has **two independent keybind slots** — e.g. bind one to a keyboard key and the
+other to a mouse button, and either one fires it — each showing up as its own row
+(the second suffixed **"(2)"**). Every slot ships **unbound** — nothing fires until you
+set one yourself — **except Toggle Module HUD's first slot, which ships bound to Right
+Shift** since that was requested as its default (its second slot still starts unbound).
 
 **PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
 Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,
