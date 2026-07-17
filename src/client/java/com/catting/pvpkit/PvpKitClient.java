@@ -100,8 +100,21 @@ public class PvpKitClient implements ClientModInitializer {
     // ---- Totem corner pop ----
     private static final long TOTEM_POP_MS = 1500L;
     private static long totemPopStart = -1L;
-    /** The real item, so the corner pop shows the actual totem sprite (not a coloured square). */
-    private static final ItemStack TOTEM_STACK = new ItemStack(Items.TOTEM_OF_UNDYING);
+    /**
+     * The real item, so the corner pop shows the actual totem sprite (not a coloured
+     * square). Built lazily on first render, NOT as a static field initializer --
+     * constructing an ItemStack from a Holder<Item> that early crashes the game with
+     * "Components not bound yet" (item registry components aren't bound until partway
+     * through Minecraft's own bootstrap, but this mod's class -- and therefore this
+     * field -- loads earlier than that, during Fabric's client-entrypoint invocation).
+     * By the time renderTotemPop() actually runs, bootstrap is long finished.
+     */
+    private static ItemStack totemStack;
+
+    private static ItemStack totemStack() {
+        if (totemStack == null) totemStack = new ItemStack(Items.TOTEM_OF_UNDYING);
+        return totemStack;
+    }
 
     // ---- Crystal-only explosion removal ----
     private static final Map<Integer, double[]> presentCrystals = new HashMap<>();
@@ -707,7 +720,7 @@ public class PvpKitClient implements ClientModInitializer {
         pose.pushMatrix();
         pose.translate(ax, ay + bob);
         pose.scale(sx, sy);
-        g.item(TOTEM_STACK, -8, -8); // centre the 16px icon on the origin
+        g.item(totemStack(), -8, -8); // centre the 16px icon on the origin
         pose.popMatrix();
     }
 
