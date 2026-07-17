@@ -43,10 +43,13 @@ does nothing meaningful (and would be rule-breaking) on a public server.
 
 ## Features (HUD / Totem / Clean View / Combat / Locator pages)
 - **HUD** — FPS + CPS + Ping (tab-list latency), all **RGB rainbow-cycling** text, bottom-left (clear of Xaero).
-- **Totem corner pop** — small gold pop (configurable corner) on your own totem. Both the pop
-  and the centre-animation hide are driven from `GameRenderer#displayItemActivation`, which in
-  26.2 is called only from `ClientPacketListener#handleEntityEvent`'s totem branch and only for
-  the local player, so it's an exact "our totem popped" signal.
+- **Totem corner pop** — renders the real totem sprite via `GuiGraphicsExtractor#item` with a
+  scale-in/spin/shrink-out animation echoing the vanilla centre pop (the vertical-axis spin is
+  faked in the 2D HUD layer by squashing horizontal scale with `|cos|`; the true vanilla effect
+  is a 3D camera-space tumble the HUD can't drive). Both the pop and the centre-animation hide
+  are driven from `GameRenderer#displayItemActivation`, which in 26.2 is called only from
+  `ClientPacketListener#handleEntityEvent`'s totem branch and only for the local player, so it's
+  an exact "our totem popped" signal.
 - **Clean view** — no slowness FOV zoom (keeps speed/sprint/bow-draw, scaled to Slowness level),
   no nausea/portal warp, no hurt tilt, no blindness/darkness fog.
 - **Fullbright** — client-side Night Vision (topped up quietly), so it **works under shaders**

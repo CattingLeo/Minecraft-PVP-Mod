@@ -44,9 +44,9 @@ FPS, CPS, and Ping — all rainbow-cycling text, positioned bottom-left to stay 
 minimap overlays like Xaero's.
 
 ### Totem
-A small gold marker pops in a screen corner the moment *you* pop a totem (instead of
-the big vanilla animation, which can optionally stay hidden). Corner, size, and
-duration are all configurable.
+The actual totem-of-undying sprite pops in a screen corner the moment *you* pop a totem —
+a small echo of the vanilla animation (scale-in, spin, shrink-out) instead of the big
+centre-screen one, which can optionally stay hidden. Corner and size are configurable.
 
 ### Clean View
 - No slowness FOV zoom — while keeping speed/sprint/bow-draw zoom intact, scaled to the

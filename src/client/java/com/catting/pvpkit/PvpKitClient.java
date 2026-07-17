@@ -98,8 +98,10 @@ public class PvpKitClient implements ClientModInitializer {
     }
 
     // ---- Totem corner pop ----
-    private static final long TOTEM_POP_MS = 1000L;
+    private static final long TOTEM_POP_MS = 1500L;
     private static long totemPopStart = -1L;
+    /** The real item, so the corner pop shows the actual totem sprite (not a coloured square). */
+    private static final ItemStack TOTEM_STACK = new ItemStack(Items.TOTEM_OF_UNDYING);
 
     // ---- Crystal-only explosion removal ----
     private static final Map<Integer, double[]> presentCrystals = new HashMap<>();
@@ -649,6 +651,19 @@ public class PvpKitClient implements ClientModInitializer {
         }
     }
 
+    /**
+     * Corner totem pop. Renders the ACTUAL totem-of-undying item sprite (via
+     * GuiGraphicsExtractor#item) and animates it to echo the vanilla centre pop:
+     * a punchy scale-in with a little overshoot, a couple of spins about the
+     * vertical axis (faked in 2D by squashing horizontal scale with |cos| so the
+     * flat sprite reads as turning edge-on), a gentle bob, then a shrink-out. The
+     * true vanilla animation is a 3D tumble in camera space, which the 2D HUD
+     * layer can't drive — this is the closest faithful match here, and a large
+     * improvement over the old flat gold square.
+     *
+     * TOTEM_PEAK (from the "Size %" config) sets the settled on-screen size;
+     * TOTEM_CORNER picks the corner (0 TL, 1 TR, 2 BL, 3 BR).
+     */
     private void renderTotemPop(GuiGraphicsExtractor g, int w, int h) {
         if (totemPopStart < 0) return;
         long elapsed = System.currentTimeMillis() - totemPopStart;
@@ -656,18 +671,43 @@ public class PvpKitClient implements ClientModInitializer {
             totemPopStart = -1L;
             return;
         }
-        float t = elapsed / (float) TOTEM_POP_MS;
-        float scale = (t < 0.3f) ? (t / 0.3f) * TOTEM_PEAK : TOTEM_PEAK * (1.0f - (t - 0.3f) / 0.7f);
-        if (scale <= 0.01f) return;
-        int pad = 12 + Math.round(8 * TOTEM_PEAK);
+        float t = elapsed / (float) TOTEM_POP_MS; // 0..1 over the pop's lifetime
+
+        // Scale envelope: ease-out pop-in with overshoot (0..0.25), settle to 1
+        // (0.25..0.8), shrink out (0.8..1).
+        float grow;
+        if (t < 0.25f) {
+            float u = t / 0.25f;
+            grow = (1.0f - (1.0f - u) * (1.0f - u)) * 1.18f; // ease-out * overshoot
+        } else if (t < 0.8f) {
+            float u = (t - 0.25f) / 0.55f;
+            grow = 1.18f - 0.18f * u;                        // settle 1.18 -> 1.0
+        } else {
+            float u = (t - 0.8f) / 0.2f;
+            grow = 1.0f - u;                                 // shrink out
+        }
+        if (grow <= 0.02f) return;
+
+        // Fake Y-axis spin: ease-out so it whirls early and lands facing forward
+        // (ends on a whole number of half-turns, cos = ±1 -> flip = 1).
+        float spin = (1.0f - (1.0f - t) * (1.0f - t)) * (float) (Math.PI * 4);
+        float flip = Math.max(0.06f, Math.abs((float) Math.cos(spin)));
+        float bob = (float) Math.sin(t * Math.PI * 2) * 1.5f;
+
+        float base = 16.0f * TOTEM_PEAK;      // settled pixel size of the icon
+        float unit = base / 16.0f;            // item() draws at a fixed 16px
+        float sx = unit * grow * flip;
+        float sy = unit * grow;
+
+        int pad = Math.round(6 + base * 0.6f);
         int ax = (TOTEM_CORNER == 1 || TOTEM_CORNER == 3) ? w - pad : pad;
         int ay = (TOTEM_CORNER == 2 || TOTEM_CORNER == 3) ? h - pad : pad;
+
         var pose = g.pose();
         pose.pushMatrix();
-        pose.translate(ax, ay);
-        pose.scale(scale, scale);
-        g.fill(-9, -9, 9, 9, 0xFF3A2E10);
-        g.fill(-8, -8, 8, 8, 0xFFE8B84B);
+        pose.translate(ax, ay + bob);
+        pose.scale(sx, sy);
+        g.item(TOTEM_STACK, -8, -8); // centre the 16px icon on the origin
         pose.popMatrix();
     }
 
