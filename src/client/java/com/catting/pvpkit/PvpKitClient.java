@@ -20,6 +20,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -72,6 +74,7 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean NO_CRYSTAL_EXPLOSION = true;
     public static boolean COOLDOWN_FLASH = true;
     public static boolean SHOW_HIT_MARKER = true;
+    public static boolean HOTBAR_SWAP_SOUND = true;
 
     // ---- Utility (Auto Totem / Auto Eat / Criticals / module HUD) ----
     public static boolean AUTO_TOTEM = false;
@@ -95,7 +98,7 @@ public class PvpKitClient implements ClientModInitializer {
         LOCATOR_DISABLE_IN_SPECTATOR = c.locatorDisableInSpectator;
         LOCATOR_SHOW_THROUGH_WALLS = c.locatorShowThroughWalls;
         NO_CRYSTAL_EXPLOSION = c.noCrystalExplosion; COOLDOWN_FLASH = c.cooldownFlash;
-        SHOW_HIT_MARKER = c.showHitMarker;
+        SHOW_HIT_MARKER = c.showHitMarker; HOTBAR_SWAP_SOUND = c.hotbarSwapSound;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
         CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
     }
@@ -145,6 +148,9 @@ public class PvpKitClient implements ClientModInitializer {
     // ---- clean-view option change tracking ----
     private Boolean lastNausea;
     private Boolean lastHurt;
+
+    // ---- hotbar swap sound ----
+    private int lastHotbarSlot = -1;
 
     // ---- CPS ----
     private static final long CPS_WINDOW_MS = 1000L;
@@ -239,6 +245,15 @@ public class PvpKitClient implements ClientModInitializer {
                     || cds.isOnCooldown(mc.player.getOffhandItem());
             if (prevCooldown && !nowCd) cooldownFlashStart = System.currentTimeMillis();
             prevCooldown = nowCd;
+        }
+
+        if (HOTBAR_SWAP_SOUND && mc.level != null) {
+            int slot = mc.player.getInventory().getSelectedSlot();
+            if (lastHotbarSlot != -1 && slot != lastHotbarSlot) {
+                mc.level.playLocalSound(mc.player, SoundEvents.NOTE_BLOCK_IRON_XYLOPHONE.value(),
+                        SoundSource.PLAYERS, 0.6f, 1.0f);
+            }
+            lastHotbarSlot = slot;
         }
 
         if (CRITICALS) updateCriticals(mc);

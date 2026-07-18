@@ -81,6 +81,10 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(true).setSaveConsumer(v -> c.cooldownFlash = v).build());
             combat.addEntry(e.startBooleanToggle(Component.literal("Hit marker on landing a hit"), c.showHitMarker)
                     .setDefaultValue(true).setSaveConsumer(v -> c.showHitMarker = v).build());
+            combat.addEntry(e.startBooleanToggle(Component.literal("Hotbar swap sound"), c.hotbarSwapSound)
+                    .setDefaultValue(true)
+                    .setTooltip(Component.literal("A short metallic note-block blip (Iron Xylophone) every time you switch hotbar slots."))
+                    .setSaveConsumer(v -> c.hotbarSwapSound = v).build());
 
             // ---------------- Locator ----------------
             // Points a fancy corner arrow at ONE named player. Intended for a friend/
