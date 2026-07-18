@@ -1,17 +1,10 @@
 {
 	"key.category.nocooldown.no_cooldown": "No Cooldown",
 	"key.nocooldown.cycle_mode": "Cycle Mode (Disabled/Spear/Everything)",
-	"key.nocooldown.cycle_mode_2": "Cycle Mode (Disabled/Spear/Everything) (2)",
 	"key.nocooldown.toggle_durability": "Toggle Unlimited Durability",
-	"key.nocooldown.toggle_durability_2": "Toggle Unlimited Durability (2)",
 	"key.nocooldown.toggle_instant_use": "Toggle Instant Use",
-	"key.nocooldown.toggle_instant_use_2": "Toggle Instant Use (2)",
 	"key.nocooldown.toggle_no_damage": "Toggle No Damage",
-	"key.nocooldown.toggle_no_damage_2": "Toggle No Damage (2)",
 	"key.nocooldown.toggle_flight": "Toggle Flight",
-	"key.nocooldown.toggle_flight_2": "Toggle Flight (2)",
 	"key.nocooldown.toggle_hunger": "Toggle Infinite Hunger",
-	"key.nocooldown.toggle_hunger_2": "Toggle Infinite Hunger (2)",
-	"key.nocooldown.toggle_kill_aura": "Toggle Kill Aura",
-	"key.nocooldown.toggle_kill_aura_2": "Toggle Kill Aura (2)"
+	"key.nocooldown.toggle_kill_aura": "Toggle Kill Aura"
 }

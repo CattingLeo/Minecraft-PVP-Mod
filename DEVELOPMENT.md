@@ -135,18 +135,21 @@ Jar in `build/libs/` (without `-sources`). Needs Fabric API `0.153.0+26.2`.
 
 ## Keybinds
 Options -> Controls -> Key Binds -> two sections, **"PVP"** and **"No Cooldown"**.
-Every action registers TWO independent `KeyMapping`s (a `bind()`/`bind2()` pair per
-action, translation keys suffixed `_2` for the second) so you can bind e.g. a keyboard
-key AND a mouse button to the same action; either fires it. The tick loop drains both
-with `A.consumeClick() | B.consumeClick()` (bitwise, not `||`, so a tick with clicks
-queued on both slots doesn't skip draining the second). Every slot starts UNBOUND;
-nothing fires until you set one.
+Every key starts UNBOUND; nothing fires until you set one.
+
+Binding a second key to the same action (any action -- vanilla included, not just this
+mod's) is handled by installing the separate **Multi Key Bindings** mod (by kennybc)
+rather than by anything in this codebase. An earlier version of this mod tried to build
+that itself two different ways -- per-action `_2` `KeyMapping` duplicates, then a
+tick-based reflection layer driving vanilla `KeyMapping`s directly -- both ripped out in
+favor of the existing, already-solved mod once it turned up. If you're looking at git
+history and see either of those, they're gone; this is why.
 
 **PVP** section: Fullbright, Locator Arrow, Hit Marker, Cooldown Flash,
 Crystal-Only Explosion Removal, Totem Corner Pop, HUD, Clean View (bundles
 slowness FOV/nausea/hurt tilt/darkness/blindness), Auto Totem, Auto Eat, Criticals,
-Module HUD (slot 1 bound to Right Shift by default -- the one exception; its slot 2,
-and every other slot in this mod, starts unbound). Plus:
+Module HUD (bound to Right Shift by default -- every other keybind here starts unbound).
+Plus:
 - **Screenshot** -- captures your primary monitor to `files/screenshots/`.
 - **Start/Stop Recording** -- captures ~10 frames/sec to `files/screen recording/<timestamp>/`
   as a PNG sequence while toggled on.

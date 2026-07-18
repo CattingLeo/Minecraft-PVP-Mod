@@ -15,6 +15,7 @@ is configured in-game via **Mod Menu** — no config-file editing required.
 - [Fabric API](https://modrinth.com/mod/fabric-api) `0.153.0+26.2`
 - [Cloth Config](https://modrinth.com/mod/cloth-config) `26.2.155`
 - [Mod Menu](https://modrinth.com/mod/modmenu) `20.0.0-beta.4` (optional, but needed for the settings screen)
+- **Multi Key Bindings** by kennybc (optional — lets you bind more than one key to any action in the game, this mod's included; see [Keybinds](#keybinds))
 - Java 25
 
 ## Install
@@ -116,11 +117,13 @@ This mod's design draws a hard line between two categories:
 ## Keybinds
 
 Options → Controls → Key Binds → two sections, **"PVP"** and **"No Cooldown"**. Every
-action has **two independent keybind slots** — e.g. bind one to a keyboard key and the
-other to a mouse button, and either one fires it — each showing up as its own row
-(the second suffixed **"(2)"**). Every slot ships **unbound** — nothing fires until you
-set one yourself — **except Toggle Module HUD's first slot, which ships bound to Right
-Shift** since that was requested as its default (its second slot still starts unbound).
+key ships **unbound** — nothing fires until you set one yourself — **except Toggle
+Module HUD, which ships bound to Right Shift** since that was requested as its default.
+
+Want more than one key on the same action (including vanilla ones — Sprint, hotbar
+slots, Attack, anything)? Install **Multi Key Bindings** (by kennybc) alongside this mod
+— it adds a "+" to every row in the Key Binds screen for exactly that, so there's no
+need for this mod to duplicate it.
 
 **PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
 Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,

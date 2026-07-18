@@ -49,9 +49,9 @@ import net.minecraft.resources.Identifier;
  * genuinely better tool -- this is a lightweight in-mod fallback, not a
  * replacement for it.
  *
- * Every action gets TWO independent keybind slots (e.g. bind one to a mouse
- * button, the other to a keyboard key) -- each shows up as its own row in
- * Key Binds, both start unbound, and either one alone triggers the action.
+ * For a second bindable key per action (or per any action in the game,
+ * vanilla included), install the "Multi Key Bindings" mod alongside this
+ * one -- see README.md.
  */
 public final class PvpKitKeybinds {
 
@@ -59,37 +59,22 @@ public final class PvpKitKeybinds {
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath(PvpKitClient.MOD_ID, "pvp_kit"));
 
     private static final KeyMapping TOGGLE_FULLBRIGHT = bind("toggle_fullbright");
-    private static final KeyMapping TOGGLE_FULLBRIGHT_2 = bind2("toggle_fullbright");
     private static final KeyMapping TOGGLE_LOCATOR = bind("toggle_locator");
-    private static final KeyMapping TOGGLE_LOCATOR_2 = bind2("toggle_locator");
     private static final KeyMapping TOGGLE_HIT_MARKER = bind("toggle_hit_marker");
-    private static final KeyMapping TOGGLE_HIT_MARKER_2 = bind2("toggle_hit_marker");
     private static final KeyMapping TOGGLE_COOLDOWN_FLASH = bind("toggle_cooldown_flash");
-    private static final KeyMapping TOGGLE_COOLDOWN_FLASH_2 = bind2("toggle_cooldown_flash");
     private static final KeyMapping TOGGLE_CRYSTAL_EXPLOSION = bind("toggle_crystal_explosion");
-    private static final KeyMapping TOGGLE_CRYSTAL_EXPLOSION_2 = bind2("toggle_crystal_explosion");
     private static final KeyMapping TOGGLE_TOTEM_POP = bind("toggle_totem_pop");
-    private static final KeyMapping TOGGLE_TOTEM_POP_2 = bind2("toggle_totem_pop");
     private static final KeyMapping TOGGLE_HUD = bind("toggle_hud");
-    private static final KeyMapping TOGGLE_HUD_2 = bind2("toggle_hud");
     private static final KeyMapping TOGGLE_CLEAN_VIEW = bind("toggle_clean_view");
-    private static final KeyMapping TOGGLE_CLEAN_VIEW_2 = bind2("toggle_clean_view");
     private static final KeyMapping SCREENSHOT = bind("screenshot");
-    private static final KeyMapping SCREENSHOT_2 = bind2("screenshot");
     private static final KeyMapping TOGGLE_RECORDING = bind("toggle_recording");
-    private static final KeyMapping TOGGLE_RECORDING_2 = bind2("toggle_recording");
     private static final KeyMapping TOGGLE_AUTO_TOTEM = bind("toggle_auto_totem");
-    private static final KeyMapping TOGGLE_AUTO_TOTEM_2 = bind2("toggle_auto_totem");
     private static final KeyMapping TOGGLE_AUTO_EAT = bind("toggle_auto_eat");
-    private static final KeyMapping TOGGLE_AUTO_EAT_2 = bind2("toggle_auto_eat");
     private static final KeyMapping TOGGLE_CRITICALS = bind("toggle_criticals");
-    private static final KeyMapping TOGGLE_CRITICALS_2 = bind2("toggle_criticals");
-    // Slot 1 deliberately bound by default (every other slot in this mod starts
+    // Deliberately bound by default (every other keybind in this mod starts
     // unbound) -- this one was specifically requested as a Right Shift toggle.
-    // Slot 2 still starts unbound like everything else.
     private static final KeyMapping TOGGLE_MODULE_HUD = KeyMappingHelper.registerKeyMapping(new KeyMapping(
             "key.pvpkit.toggle_module_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, CATEGORY));
-    private static final KeyMapping TOGGLE_MODULE_HUD_2 = bind2("toggle_module_hud");
 
     private static Robot robot;
     private static boolean recording = false;
@@ -117,12 +102,6 @@ public final class PvpKitKeybinds {
                 "key.pvpkit." + path, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
     }
 
-    /** Second independent slot for the same action -- its own row, own translation key, starts unbound. */
-    private static KeyMapping bind2(String path) {
-        return KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.pvpkit." + path + "_2", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY));
-    }
-
     public static void register() {
         try {
             robot = new Robot();
@@ -132,21 +111,20 @@ public final class PvpKitKeybinds {
         ClientTickEvents.END_CLIENT_TICK.register(PvpKitKeybinds::onTick);
     }
 
-    // Bitwise OR (not ||) so both slots' click queues get drained every iteration, not just the first with clicks pending.
     private static void onTick(Minecraft mc) {
-        while (TOGGLE_FULLBRIGHT.consumeClick() | TOGGLE_FULLBRIGHT_2.consumeClick()) toggle(c -> c.fullbright = !c.fullbright);
-        while (TOGGLE_LOCATOR.consumeClick() | TOGGLE_LOCATOR_2.consumeClick()) toggle(c -> c.locatorEnabled = !c.locatorEnabled);
-        while (TOGGLE_HIT_MARKER.consumeClick() | TOGGLE_HIT_MARKER_2.consumeClick()) toggle(c -> c.showHitMarker = !c.showHitMarker);
-        while (TOGGLE_COOLDOWN_FLASH.consumeClick() | TOGGLE_COOLDOWN_FLASH_2.consumeClick()) toggle(c -> c.cooldownFlash = !c.cooldownFlash);
-        while (TOGGLE_CRYSTAL_EXPLOSION.consumeClick() | TOGGLE_CRYSTAL_EXPLOSION_2.consumeClick()) toggle(c -> c.noCrystalExplosion = !c.noCrystalExplosion);
-        while (TOGGLE_TOTEM_POP.consumeClick() | TOGGLE_TOTEM_POP_2.consumeClick()) toggle(c -> c.totemPop = !c.totemPop);
-        while (TOGGLE_HUD.consumeClick() | TOGGLE_HUD_2.consumeClick()) toggle(c -> {
+        while (TOGGLE_FULLBRIGHT.consumeClick()) toggle(c -> c.fullbright = !c.fullbright);
+        while (TOGGLE_LOCATOR.consumeClick()) toggle(c -> c.locatorEnabled = !c.locatorEnabled);
+        while (TOGGLE_HIT_MARKER.consumeClick()) toggle(c -> c.showHitMarker = !c.showHitMarker);
+        while (TOGGLE_COOLDOWN_FLASH.consumeClick()) toggle(c -> c.cooldownFlash = !c.cooldownFlash);
+        while (TOGGLE_CRYSTAL_EXPLOSION.consumeClick()) toggle(c -> c.noCrystalExplosion = !c.noCrystalExplosion);
+        while (TOGGLE_TOTEM_POP.consumeClick()) toggle(c -> c.totemPop = !c.totemPop);
+        while (TOGGLE_HUD.consumeClick()) toggle(c -> {
             boolean v = !c.showFps;
             c.showFps = v;
             c.showCps = v;
             c.showPing = v;
         });
-        while (TOGGLE_CLEAN_VIEW.consumeClick() | TOGGLE_CLEAN_VIEW_2.consumeClick()) toggle(c -> {
+        while (TOGGLE_CLEAN_VIEW.consumeClick()) toggle(c -> {
             boolean v = !c.noSlownessFov;
             c.noSlownessFov = v;
             c.noNausea = v;
@@ -154,12 +132,12 @@ public final class PvpKitKeybinds {
             c.noDarkness = v;
             c.noBlindness = v;
         });
-        while (SCREENSHOT.consumeClick() | SCREENSHOT_2.consumeClick()) takeScreenshot(mc);
-        while (TOGGLE_RECORDING.consumeClick() | TOGGLE_RECORDING_2.consumeClick()) toggleRecording(mc);
-        while (TOGGLE_AUTO_TOTEM.consumeClick() | TOGGLE_AUTO_TOTEM_2.consumeClick()) toggle(c -> c.autoTotem = !c.autoTotem);
-        while (TOGGLE_AUTO_EAT.consumeClick() | TOGGLE_AUTO_EAT_2.consumeClick()) toggle(c -> c.autoEat = !c.autoEat);
-        while (TOGGLE_CRITICALS.consumeClick() | TOGGLE_CRITICALS_2.consumeClick()) toggle(c -> c.criticals = !c.criticals);
-        while (TOGGLE_MODULE_HUD.consumeClick() | TOGGLE_MODULE_HUD_2.consumeClick()) toggle(c -> c.moduleHud = !c.moduleHud);
+        while (SCREENSHOT.consumeClick()) takeScreenshot(mc);
+        while (TOGGLE_RECORDING.consumeClick()) toggleRecording(mc);
+        while (TOGGLE_AUTO_TOTEM.consumeClick()) toggle(c -> c.autoTotem = !c.autoTotem);
+        while (TOGGLE_AUTO_EAT.consumeClick()) toggle(c -> c.autoEat = !c.autoEat);
+        while (TOGGLE_CRITICALS.consumeClick()) toggle(c -> c.criticals = !c.criticals);
+        while (TOGGLE_MODULE_HUD.consumeClick()) toggle(c -> c.moduleHud = !c.moduleHud);
 
         if (recording) {
             long now = System.currentTimeMillis();
