@@ -46,8 +46,14 @@ does nothing meaningful (and would be rule-breaking) on a public server.
 - **Totem corner pop** — renders the real totem sprite via `GuiGraphicsExtractor#item` with a
   scale-in/spin/shrink-out animation echoing the vanilla centre pop (the vertical-axis spin is
   faked in the 2D HUD layer by squashing horizontal scale with `|cos|`; the true vanilla effect
-  is a 3D camera-space tumble the HUD can't drive). Both the pop and the centre-animation hide
-  are driven from `GameRenderer#displayItemActivation`, which in 26.2 is called only from
+  is a 3D camera-space tumble the HUD can't drive), plus a small gold/green spark burst
+  radiating from it over the pop's first ~45% (seeded by the pop's own start time, so every
+  frame of one pop draws identical spark paths rather than jittering -- vanilla's real totem
+  particles already play in the world via `ParticleEngine#createTrackingEmitter` regardless of
+  this HUD indicator; the HUD layer can't spawn real Level particles, so this fakes the same
+  look in 2D). Also triggers a brief full-screen red flash (`Screen flash on pop`, default on).
+  All three (pop, sparks, flash) and the centre-animation hide are driven from
+  `GameRenderer#displayItemActivation`, which in 26.2 is called only from
   `ClientPacketListener#handleEntityEvent`'s totem branch and only for the local player, so it's
   an exact "our totem popped" signal.
 - **Clean view** — no slowness FOV zoom (keeps speed/sprint/bow-draw, scaled to Slowness level),

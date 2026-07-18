@@ -35,6 +35,7 @@ public class PvpKitConfig {
     public boolean hideCenterTotem = true;
     public TotemCorner totemCorner = TotemCorner.TOP_RIGHT;
     public int totemSizePct = 160;  // 100 = 16px
+    public boolean totemFlash = true;
 
     // --- Clean view ---
     public boolean noSlownessFov = true;

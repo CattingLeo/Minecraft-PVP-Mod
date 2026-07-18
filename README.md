@@ -46,8 +46,10 @@ minimap overlays like Xaero's.
 
 ### Totem
 The actual totem-of-undying sprite pops in a screen corner the moment *you* pop a totem —
-a small echo of the vanilla animation (scale-in, spin, shrink-out) instead of the big
-centre-screen one, which can optionally stay hidden. Corner and size are configurable.
+a small echo of the vanilla animation (scale-in, spin, shrink-out, plus a little gold/green
+spark burst) instead of the big centre-screen one, which can optionally stay hidden. Corner
+and size are configurable. A brief full-screen red flash fires at the same instant (its own
+toggle, on by default).
 
 ### Clean View
 - No slowness FOV zoom — while keeping speed/sprint/bow-draw zoom intact, scaled to the

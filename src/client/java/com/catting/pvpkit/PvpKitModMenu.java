@@ -53,6 +53,10 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(TotemCorner.TOP_RIGHT).setSaveConsumer(v -> c.totemCorner = v).build());
             totem.addEntry(e.startIntSlider(Component.literal("Size %"), c.totemSizePct, 100, 300)
                     .setDefaultValue(160).setSaveConsumer(v -> c.totemSizePct = v).build());
+            totem.addEntry(e.startBooleanToggle(Component.literal("Screen flash on pop"), c.totemFlash)
+                    .setDefaultValue(true)
+                    .setTooltip(Component.literal("A brief full-screen red flash the instant your totem pops."))
+                    .setSaveConsumer(v -> c.totemFlash = v).build());
 
             // ---------------- Clean view ----------------
             ConfigCategory clean = b.getOrCreateCategory(Component.literal("Clean View"));

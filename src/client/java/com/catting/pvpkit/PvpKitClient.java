@@ -3,6 +3,7 @@ package com.catting.pvpkit;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import com.catting.nocooldown.NoCooldownConfig;
 
@@ -54,6 +55,7 @@ public class PvpKitClient implements ClientModInitializer {
     public static int TOTEM_CORNER = 1;     // 0 TL, 1 TR, 2 BL, 3 BR
     public static boolean HIDE_CENTER_TOTEM = true;
     public static float TOTEM_PEAK = 1.6f;
+    public static boolean TOTEM_FLASH = true;
 
     public static boolean NO_SLOWNESS_FOV = true;
     public static boolean NO_NAUSEA = true;
@@ -85,6 +87,7 @@ public class PvpKitClient implements ClientModInitializer {
         ANCHOR_X = c.hudX; ANCHOR_Y = c.hudY;
         TOTEM_POP = c.totemPop; HIDE_CENTER_TOTEM = c.hideCenterTotem;
         TOTEM_CORNER = c.totemCorner.ordinal(); TOTEM_PEAK = c.totemSizePct / 100.0f;
+        TOTEM_FLASH = c.totemFlash;
         NO_SLOWNESS_FOV = c.noSlownessFov; NO_NAUSEA = c.noNausea; NO_HURT_TILT = c.noHurtTilt;
         NO_DARKNESS = c.noDarkness; NO_BLINDNESS = c.noBlindness;
         FULLBRIGHT = c.fullbright;
@@ -100,6 +103,8 @@ public class PvpKitClient implements ClientModInitializer {
     // ---- Totem corner pop ----
     private static final long TOTEM_POP_MS = 1500L;
     private static long totemPopStart = -1L;
+    private static final long TOTEM_FLASH_MS = 450L;
+    private static long totemFlashStart = -1L;
     /**
      * The real item, so the corner pop shows the actual totem sprite (not a coloured
      * square). Built lazily on first render, NOT as a static field initializer --
@@ -149,7 +154,9 @@ public class PvpKitClient implements ClientModInitializer {
     private boolean prevRight;
 
     public static void triggerTotemPop() {
-        totemPopStart = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+        totemPopStart = now;
+        totemFlashStart = now;
     }
 
     public static synchronized void recordCrystalLoad(int id, double x, double y, double z) {
@@ -362,6 +369,10 @@ public class PvpKitClient implements ClientModInitializer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+
+        if (TOTEM_FLASH) renderTotemFlash(graphics, w, h); // full-screen wash, drawn first so HUD text sits on top of it
         if (COOLDOWN_FLASH) renderCrosshairFlash(graphics, mc);
         if (SHOW_HIT_MARKER) renderHitMarker(graphics, mc);
         renderLocatorArrow(graphics, mc); // always called so it can self-clean any glow tag
@@ -377,8 +388,6 @@ public class PvpKitClient implements ClientModInitializer {
         purge(leftClicks, now);
         purge(rightClicks, now);
 
-        int w = mc.getWindow().getGuiScaledWidth();
-        int h = mc.getWindow().getGuiScaledHeight();
         int ox = ANCHOR_X >= 0 ? ANCHOR_X : w + ANCHOR_X;
         int oy = ANCHOR_Y >= 0 ? ANCHOR_Y : h + ANCHOR_Y;
 
@@ -716,12 +725,63 @@ public class PvpKitClient implements ClientModInitializer {
         int ax = (TOTEM_CORNER == 1 || TOTEM_CORNER == 3) ? w - pad : pad;
         int ay = (TOTEM_CORNER == 2 || TOTEM_CORNER == 3) ? h - pad : pad;
 
+        renderTotemSparks(g, ax, ay, t); // behind the icon
+
         var pose = g.pose();
         pose.pushMatrix();
         pose.translate(ax, ay + bob);
         pose.scale(sx, sy);
         g.item(totemStack(), -8, -8); // centre the 16px icon on the origin
         pose.popMatrix();
+    }
+
+    private static final int SPARK_COUNT = 12;
+    private static final float SPARK_BURST_FRACTION = 0.45f; // sparks only play over the pop's first 45%
+
+    /**
+     * Small gold/green "spark" burst radiating from the corner pop, echoing
+     * vanilla's own totem particle effect (a real Level-space ParticleEngine
+     * emitter, which already plays in the world regardless of this HUD
+     * indicator -- see ClientPacketListener's totem branch). HUD rendering is
+     * 2D screen space and can't spawn real particles, so this fakes the same
+     * look with small drawn squares flying outward and fading.
+     *
+     * Seeded by totemPopStart (not a free-running clock), so every frame of
+     * the same pop draws identical spark paths instead of jittering.
+     */
+    private void renderTotemSparks(GuiGraphicsExtractor g, int ax, int ay, float t) {
+        if (t > SPARK_BURST_FRACTION) return;
+        float burstT = t / SPARK_BURST_FRACTION; // 0..1 across the burst's own lifetime
+        var rng = new Random(totemPopStart);
+        for (int i = 0; i < SPARK_COUNT; i++) {
+            double angle = (Math.PI * 2 * i / SPARK_COUNT) + (rng.nextDouble() - 0.5) * 0.5;
+            float speed = 16.0f + rng.nextFloat() * 16.0f; // total px travelled over the burst
+            boolean gold = rng.nextBoolean();
+            float ease = 1.0f - (1.0f - burstT) * (1.0f - burstT); // ease-out
+            float dist = speed * ease;
+            int sx = ax + (int) Math.round(Math.cos(angle) * dist);
+            int sy = ay + (int) Math.round(Math.sin(angle) * dist);
+            int alpha = Math.max(0, 255 - (int) (burstT * 255));
+            int color = (alpha << 24) | (gold ? 0xE8B84B : 0x2E9E4F);
+            int size = burstT < 0.2f ? 2 : 1;
+            g.fill(sx - size, sy - size, sx + size, sy + size, color);
+        }
+    }
+
+    /** Full-screen red wash on totem pop, same fill()-only technique as the rest of this HUD. */
+    private void renderTotemFlash(GuiGraphicsExtractor g, int w, int h) {
+        if (totemFlashStart < 0) return;
+        long elapsed = System.currentTimeMillis() - totemFlashStart;
+        if (elapsed > TOTEM_FLASH_MS) {
+            totemFlashStart = -1L;
+            return;
+        }
+        float t = elapsed / (float) TOTEM_FLASH_MS;
+        // Quick punch in, then fade out -- peaks around 15% of the flash's lifetime.
+        float strength = t < 0.15f ? (t / 0.15f) : (1.0f - (t - 0.15f) / 0.85f);
+        int alpha = Math.max(0, Math.min(130, (int) (strength * 130))); // capped well short of a full blackout
+        int color = (alpha << 24) | 0xFF0000;
+        g.fill(0, 0, w, h, color);
     }
 
     private static int rainbow() {
