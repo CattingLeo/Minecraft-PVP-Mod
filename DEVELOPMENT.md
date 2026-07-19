@@ -69,6 +69,10 @@ does nothing meaningful (and would be rule-breaking) on a public server.
   `ClientLevel#playLocalSound`, local-only. The note-block instrument constants are
   `Holder<SoundEvent>`, not plain `SoundEvent` like `ANVIL_LAND` -- needs `.value()` to unwrap
   before passing to `playLocalSound`, unlike most other sound calls in this codebase.
+- **Hotbar swap crosshair flash** — same hotbar-slot edge-detect as the sound above (one shared
+  check, two independent toggles) and the exact same `blitSprite`/`hud/crosshair` mechanism as
+  the cooldown flash, just green (`0xFF00FF00`) and its own start-time field so the two flashes
+  don't fight over one timer if they ever overlap.
 - **Locator arrow** — fancy corner/edge arrow pointing toward your nearest other
   player, with a live distance readout. No name entry, one on/off toggle. Hides
   automatically once you actually have a clear line of sight to them (real raycast via

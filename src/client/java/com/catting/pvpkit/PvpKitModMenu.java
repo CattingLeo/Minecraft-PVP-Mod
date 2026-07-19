@@ -85,6 +85,10 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("A short metallic note-block blip (Iron Xylophone) every time you switch hotbar slots."))
                     .setSaveConsumer(v -> c.hotbarSwapSound = v).build());
+            combat.addEntry(e.startBooleanToggle(Component.literal("Hotbar swap crosshair flash"), c.hotbarSwapFlash)
+                    .setDefaultValue(true)
+                    .setTooltip(Component.literal("The crosshair flashes green every time you switch hotbar slots -- same mechanism as the red cooldown flash above."))
+                    .setSaveConsumer(v -> c.hotbarSwapFlash = v).build());
 
             // ---------------- Locator ----------------
             // Points a fancy corner arrow at ONE named player. Intended for a friend/

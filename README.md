@@ -69,6 +69,8 @@ toggle, on by default).
   from the cooldown flash.
 - **Hotbar swap sound** — a short metallic note-block blip (Iron Xylophone) every time
   you switch hotbar slots.
+- **Hotbar swap crosshair flash** — the crosshair flashes green on the same swap, using
+  the same flash mechanism as the (red) cooldown-ready flash above.
 
 ### Locator
 A fancy arrow slides along the screen edge, pointing toward your nearest other player,

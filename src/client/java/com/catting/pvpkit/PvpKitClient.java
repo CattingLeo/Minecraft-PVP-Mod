@@ -75,6 +75,7 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean COOLDOWN_FLASH = true;
     public static boolean SHOW_HIT_MARKER = true;
     public static boolean HOTBAR_SWAP_SOUND = true;
+    public static boolean HOTBAR_SWAP_FLASH = true;
 
     // ---- Utility (Auto Totem / Auto Eat / Criticals / module HUD) ----
     public static boolean AUTO_TOTEM = false;
@@ -99,6 +100,7 @@ public class PvpKitClient implements ClientModInitializer {
         LOCATOR_SHOW_THROUGH_WALLS = c.locatorShowThroughWalls;
         NO_CRYSTAL_EXPLOSION = c.noCrystalExplosion; COOLDOWN_FLASH = c.cooldownFlash;
         SHOW_HIT_MARKER = c.showHitMarker; HOTBAR_SWAP_SOUND = c.hotbarSwapSound;
+        HOTBAR_SWAP_FLASH = c.hotbarSwapFlash;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
         CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
     }
@@ -135,6 +137,9 @@ public class PvpKitClient implements ClientModInitializer {
     private static final int CROSSHAIR_SIZE = 15;
     private static long cooldownFlashStart = -1L;
     private boolean prevCooldown = false;
+
+    // ---- Hotbar swap crosshair flash (green, reuses the crosshair-flash mechanism above) ----
+    private static long hotbarFlashStart = -1L;
 
     private static final long HIT_MARKER_MS = 180L;
     private static long hitMarkerStart = -1L;
@@ -247,11 +252,16 @@ public class PvpKitClient implements ClientModInitializer {
             prevCooldown = nowCd;
         }
 
-        if (HOTBAR_SWAP_SOUND && mc.level != null) {
+        if (mc.level != null) {
             int slot = mc.player.getInventory().getSelectedSlot();
             if (lastHotbarSlot != -1 && slot != lastHotbarSlot) {
-                mc.level.playLocalSound(mc.player, SoundEvents.NOTE_BLOCK_IRON_XYLOPHONE.value(),
-                        SoundSource.PLAYERS, 0.6f, 1.0f);
+                if (HOTBAR_SWAP_SOUND) {
+                    mc.level.playLocalSound(mc.player, SoundEvents.NOTE_BLOCK_IRON_XYLOPHONE.value(),
+                            SoundSource.PLAYERS, 0.6f, 1.0f);
+                }
+                if (HOTBAR_SWAP_FLASH) {
+                    hotbarFlashStart = System.currentTimeMillis();
+                }
             }
             lastHotbarSlot = slot;
         }
@@ -389,6 +399,7 @@ public class PvpKitClient implements ClientModInitializer {
 
         if (TOTEM_FLASH) renderTotemFlash(graphics, w, h); // full-screen wash, drawn first so HUD text sits on top of it
         if (COOLDOWN_FLASH) renderCrosshairFlash(graphics, mc);
+        if (HOTBAR_SWAP_FLASH) renderHotbarSwapFlash(graphics, mc);
         if (SHOW_HIT_MARKER) renderHitMarker(graphics, mc);
         renderLocatorArrow(graphics, mc); // always called so it can self-clean any glow tag
         renderToast(graphics, mc);
@@ -479,6 +490,19 @@ public class PvpKitClient implements ClientModInitializer {
         int y = (mc.getWindow().getGuiScaledHeight() - CROSSHAIR_SIZE) / 2;
         g.blitSprite(RenderPipelines.GUI_TEXTURED, CROSSHAIR_SPRITE,
                 x, y, CROSSHAIR_SIZE, CROSSHAIR_SIZE, 0xFFFF0000);
+    }
+
+    /** Same crosshair-flash mechanism as the cooldown one above, green, triggered on hotbar swap instead. */
+    private void renderHotbarSwapFlash(GuiGraphicsExtractor g, Minecraft mc) {
+        if (hotbarFlashStart < 0) return;
+        if (System.currentTimeMillis() - hotbarFlashStart > COOLDOWN_FLASH_MS) {
+            hotbarFlashStart = -1L;
+            return;
+        }
+        int x = (mc.getWindow().getGuiScaledWidth() - CROSSHAIR_SIZE) / 2;
+        int y = (mc.getWindow().getGuiScaledHeight() - CROSSHAIR_SIZE) / 2;
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, CROSSHAIR_SPRITE,
+                x, y, CROSSHAIR_SIZE, CROSSHAIR_SIZE, 0xFF00FF00);
     }
 
     /**
