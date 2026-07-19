@@ -64,15 +64,11 @@ does nothing meaningful (and would be rule-breaking) on a public server.
   was; creeper/TNT explosions stay normal.
 - **Cooldown red crosshair flash** — the crosshair sprite (your custom one included) flashes fully
   red the instant a held item's cooldown ends.
-- **Hotbar swap sound** — edge-detects `Inventory#getSelectedSlot()` changing tick-to-tick (no
-  vanilla event for this) and plays `SoundEvents.NOTE_BLOCK_IRON_XYLOPHONE` via
-  `ClientLevel#playLocalSound`, local-only. The note-block instrument constants are
-  `Holder<SoundEvent>`, not plain `SoundEvent` like `ANVIL_LAND` -- needs `.value()` to unwrap
-  before passing to `playLocalSound`, unlike most other sound calls in this codebase.
-- **Hotbar swap crosshair flash** — same hotbar-slot edge-detect as the sound above (one shared
-  check, two independent toggles) and the exact same `blitSprite`/`hud/crosshair` mechanism as
-  the cooldown flash, just green (`0xFF00FF00`) and its own start-time field so the two flashes
-  don't fight over one timer if they ever overlap.
+- **Hotbar swap crosshair flash** — edge-detects `Inventory#getSelectedSlot()` changing
+  tick-to-tick (no vanilla event for this) and reuses the exact same `blitSprite`/`hud/crosshair`
+  mechanism as the cooldown flash, just green (`0xFF00FF00`) and its own start-time field so the
+  two flashes don't fight over one timer if they ever overlap. (An earlier version of this also
+  played a `NOTE_BLOCK_IRON_XYLOPHONE` sound on the same edge-detect; removed -- visual only now.)
 - **Locator arrow** — fancy corner/edge arrow pointing toward your nearest other
   player, with a live distance readout. No name entry, one on/off toggle. Hides
   automatically once you actually have a clear line of sight to them (real raycast via

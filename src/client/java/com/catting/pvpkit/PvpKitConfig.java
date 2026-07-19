@@ -54,7 +54,6 @@ public class PvpKitConfig {
     public boolean noCrystalExplosion = true;
     public boolean cooldownFlash = true;
     public boolean showHitMarker = true;
-    public boolean hotbarSwapSound = true;
     public boolean hotbarSwapFlash = true;
 
     // --- Utility (see PvpKitClient javadoc for how each one works) ---
