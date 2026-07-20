@@ -22,6 +22,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *
  * NOTE: getMobEffect()'s exact return type and isApplicable()'s name are the two
  * version-sensitive spots. Config is non-required, so a miss is skipped, never a crash.
+ *
+ * BUG FIXED: this originally compared Holders with `==`, which silently never matched
+ * (Holder identity isn't guaranteed equal to a same-effect constant elsewhere), so
+ * blindness/darkness removal did nothing even though the mixin "worked". Holder#is(Holder)
+ * is the correct comparison -- it's marked @Deprecated by Mojang (a nudge toward more
+ * specific overloads like is(ResourceKey)/is(TagKey), not a sign it's broken or going away)
+ * but is fully functional and verified fixing the bug.
  */
 @Mixin(MobEffectFogEnvironment.class)
 public abstract class FogMixin {
@@ -33,8 +40,8 @@ public abstract class FogMixin {
     private void pvpkit$removeEffectFog(CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValueZ()) return; // already off
         Holder<MobEffect> effect = pvpkit$getMobEffect();
-        boolean blind = PvpKitClient.NO_BLINDNESS && effect == MobEffects.BLINDNESS;
-        boolean dark  = PvpKitClient.NO_DARKNESS  && effect == MobEffects.DARKNESS;
+        boolean blind = PvpKitClient.NO_BLINDNESS && effect.is(MobEffects.BLINDNESS);
+        boolean dark  = PvpKitClient.NO_DARKNESS  && effect.is(MobEffects.DARKNESS);
         if (blind || dark) {
             cir.setReturnValue(false);
         }
