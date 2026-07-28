@@ -20,7 +20,7 @@ public class PvpKitModMenu implements ModMenuApi {
             NoCooldownConfig nc = NoCooldownConfig.get();
             ConfigBuilder b = ConfigBuilder.create()
                     .setParentScreen(parent)
-                    .setTitle(Component.literal("PVP"));
+                    .setTitle(Component.literal(".PVP KIT"));
             b.setSavingRunnable(() -> {
                 PvpKitConfig.save();
                 PvpKitClient.applyConfig();

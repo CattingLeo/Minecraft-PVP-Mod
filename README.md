@@ -1,4 +1,4 @@
-# PVP
+# .PVP KIT
 
 A client-side Fabric mod for Minecraft **26.2**, built as a personal PvP toolkit for
 crystal PvP, LAN sessions with friends, and general combat quality-of-life. Everything
@@ -24,7 +24,7 @@ is configured in-game via **Mod Menu** — no config-file editing required.
 2. Drop Fabric API, Cloth Config, and (optionally) Mod Menu into your `mods` folder.
 3. Grab the latest jar from [Releases](../../releases) (or build it yourself, below) and
    drop it in `mods` too.
-4. Launch. Configure everything from **Mod Menu → PVP**.
+4. Launch. Configure everything from **Mod Menu → .PVP KIT**.
 
 ## Build from source
 
@@ -38,7 +38,7 @@ The finished jar lands in `build/libs/` — take the one **without** the `-sourc
 
 ## Features
 
-Configured entirely from **Mod Menu → PVP**, across seven pages:
+Configured entirely from **Mod Menu → .PVP KIT**, across seven pages:
 
 ### HUD
 FPS, CPS, and Ping — all rainbow-cycling text, positioned bottom-left to stay clear of
@@ -97,6 +97,20 @@ Independent sandbox toggles, plus the original three-way cooldown-removal mode:
 | **Infinite Hunger** | Food and saturation stay pinned at full |
 | **Kill Aura** | Auto-attacks the nearest valid target in range (configurable range and target type: players / hostile mobs / all) — only swings on a fully charged attack meter and only with real line of sight |
 | **All Off** | One-click reset for everything on this page |
+
+## Commands
+
+- **`/practicebot`** — summons a full-netherite (Protection IV, Unbreaking III, Mending),
+  unkillable combat dummy standing exactly where you are, wearing your own name and skin.
+- **`/practicebot shield`** — same, but it holds its shield up permanently.
+- **`/practicebot remove`** — despawns it.
+
+**Singleplayer / world-host only.** Spawning a real, hittable entity needs server
+authority, and this mod is client-side only — it only has that authority when you're
+the one hosting (true singleplayer, or you used "Open to LAN"). If you join a friend's
+world instead of hosting, you can't summon your own bot there — but if *they* summon
+one in their world, you can absolutely fight it once it's up, since it's a real entity
+synced to everyone normally.
 
 ## Fair use
 

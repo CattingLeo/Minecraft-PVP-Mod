@@ -1,4 +1,4 @@
-# PVP — Technical Documentation
+# .PVP KIT — Technical Documentation
 
 See [README.md](README.md) for user-facing setup and features. This file covers
 exact mixin targets and version-sensitive implementation notes.
@@ -6,7 +6,7 @@ exact mixin targets and version-sensitive implementation notes.
 Client-side Fabric mod for Minecraft **26.2**.
 
 ## Configuration
-Everything is toggled in-game: **Mod Menu -> PVP** (Cloth Config), with pages
+Everything is toggled in-game: **Mod Menu -> .PVP KIT** (Cloth Config), with pages
 HUD / Totem / Clean View / Combat / Locator / **No Cooldown**. Two config files:
 `config/pvpkit.json` and `config/nocooldown.json`. No rebuilds to flip features.
 
@@ -73,7 +73,7 @@ does nothing meaningful (and would be rule-breaking) on a public server.
   player, with a live distance readout. No name entry, one on/off toggle. Hides
   automatically once you actually have a clear line of sight to them (real raycast via
   `Level#clip`, not a mixin) or they're within your rough FOV. Off by default:
-  Mod Menu -> PVP -> Locator -> "Enable Locator Arrow".
+  Mod Menu -> .PVP KIT -> Locator -> "Enable Locator Arrow".
 
   **Intended for private LAN sessions with friends you've invited yourself** -- everyone
   present is someone you know, comparable to a co-op friend-finder. On a public
@@ -122,6 +122,54 @@ does nothing meaningful (and would be rule-breaking) on a public server.
   this mod bound by default (Right Shift) rather than shipping unbound.
 
 All of the above are toggled from the Mod Menu config screen, not by editing code.
+
+## Practice bot (`PracticeBotManager`, `/practicebot` / `/practicebot shield` / `/practicebot remove`)
+- **Entity**: `net.fabricmc.fabric.api.entity.FakePlayer` (from `fabric-events-interaction-v0`,
+  already a transitive dependency via the `fabric-api` bundle) — a real `ServerPlayer` subclass
+  with a working stand-in network listener (`FakePlayerPacketListener`/`FakeConnection`), not
+  something built from scratch and not a genuine connected player. `FakePlayer.get(ServerLevel,
+  GameProfile)` caches instances keyed by (level, profile), so reusing the same profile across
+  calls returns the same instance rather than creating duplicates.
+- **Skin**: clones the local player's own `GameProfile` (`Minecraft#getGameProfile()`) onto a
+  **fresh, fixed synthetic UUID** (`UUID.nameUUIDFromBytes("pvpkit:practicebot")`) with the same
+  name and the same `PropertyMap` (skin texture properties) — `new GameProfile(BOT_UUID,
+  real.name(), new PropertyMap(real.properties()))`. Never reuses the real player's own UUID:
+  two entities can't share one.
+- **Gear**: netherite helmet/chestplate/leggings/boots (Protection IV, Unbreaking III, Mending),
+  netherite sword (Sharpness V, Unbreaking III, Mending), shield (Unbreaking III, Mending), via
+  `LivingEntity#setItemSlot(EquipmentSlot, ItemStack)`. Enchantments are the modern (26.x)
+  data-component system: `ItemEnchantments.Mutable` wrapping `ItemEnchantments.EMPTY`, with each
+  `Enchantments.X` `ResourceKey<Enchantment>` resolved to a `Holder<Enchantment>` via
+  `registryAccess.lookupOrThrow(Registries.ENCHANTMENT).get(key.identifier())` (note:
+  `ResourceKey#identifier()`, not `.location()` — verify against the actual class before
+  assuming a name here, it's changed before), then written to the stack via
+  `stack.set(DataComponents.ENCHANTMENTS, ...)`.
+- **Invulnerable**: `Entity#setInvulnerable(true)` — skips vanilla's damage pipeline entirely
+  (and, since knockback is applied as part of the same hurt call, effectively also skips
+  knockback, so it doesn't get shoved around by hits either).
+- **Shield mode**: each server tick, if not already `isUsingItem()`, calls
+  `startUsingItem(InteractionHand.OFF_HAND)` — shield-blocking is a generic `LivingEntity`
+  mechanic in vanilla, not player-specific, so this works on a non-player-controlled entity the
+  same way it would on a real player holding right-click.
+- **Threading — the one real bug this shipped with and had to be fixed**: the first version
+  called `ServerLevel#addFreshEntity` directly inside the Brigadier command callback, which
+  fires on the CLIENT thread (a client command, via `ClientCommandRegistrationCallback`) — NOT
+  the server thread, even in singleplayer, where the integrated server still runs on its own
+  thread despite sharing a JVM with the client. C2ME's `preventAsyncEntityLoad` mixin correctly
+  caught this as an illegal cross-thread chunk/entity mutation and threw
+  `ConcurrentModificationException: Async entity load`, so the bot never finished being added
+  (and never rendered), while a partial/aborted registration left "UUID of added entity already
+  exists" warnings on every retry. Fixed by capturing every client-only value needed (profile,
+  exact spawn position via `Entity#position()`, yaw) as local finals BEFORE calling
+  `server.execute(() -> { ... })`, doing all entity/world mutation inside that runnable, and
+  hopping back via `mc.execute(() -> source.sendFeedback(...))` for the chat reply. Only calls
+  `addFreshEntity` if `level.getEntity(BOT_UUID) == null` (not already tracked in that level) --
+  repeat `/practicebot` calls just reposition/re-equip the existing tracked entity directly,
+  since normal per-tick entity sync picks up the moved position on its own without needing to
+  re-add it.
+- **Scope**: singleplayer / world-host only. `Minecraft#getSingleplayerServer()` is null for
+  anyone who only joined someone else's world (no server authority from the client side in that
+  case) -- see the README's Commands section for the player-facing version of this limit.
 
 ## Build
 Requires JDK 25.
