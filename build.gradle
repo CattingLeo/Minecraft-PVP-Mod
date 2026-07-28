@@ -19,6 +19,8 @@ repositories {
 loom {
 	splitEnvironmentSourceSets()
 
+	accessWidenerPath = file("src/main/resources/pvpkit.accesswidener")
+
 	mods {
 		"pvpkit" {
 			sourceSet sourceSets.main

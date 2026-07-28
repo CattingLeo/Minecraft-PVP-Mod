@@ -7,6 +7,7 @@ import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
@@ -17,24 +18,26 @@ import net.minecraft.world.phys.Vec3;
  * from PracticeBotManager's END_SERVER_TICK hook (so everything here is
  * already on the server thread).
  *
- * IMPORTANT -- why this is all hand-driven rather than using vanilla AI or
- * physics: `FakePlayer#tick()` is a literal no-op (verified in the Fabric
- * API bytecode: the method body is just `return`). That means the bot has
- * NO gravity, NO collision, NO movement from `setDeltaMovement`, and its
- * attack-strength ticker never recovers. So:
- *   - all movement is manual `setPos` stepping, not velocity;
+ * IMPORTANT -- why this is all hand-driven rather than using vanilla AI:
+ * `FakePlayer#tick()` is a literal no-op (verified in the Fabric API
+ * bytecode: the method body is just `return`). Nothing ticks the bot's
+ * physics, applies gravity, or recharges its attack-strength meter for us.
+ * So:
+ *   - gravity is integrated manually (`verticalVelocity` + `getGravity()`),
+ *     but movement itself goes through `Entity#move(MoverType.SELF, ...)`,
+ *     which runs vanilla's real collision resolution -- so the bot walks
+ *     into walls and lands on ground properly instead of clipping through
+ *     terrain or teleporting to the player's Y;
  *   - attack pacing uses our own tick counters, NOT
  *     `getAttackStrengthScale` (which would stay pinned after the first
  *     `resetAttackStrengthTicker` and never recharge);
  *   - vertical manoeuvres (mace launch, elytra dive) are scripted arcs
- *     rather than real ballistics.
- * Consequence worth knowing: with no collision the bot can clip through
- * terrain while chasing, and it keeps its Y locked to the player's ground
- * level rather than truly falling. It's a sparring dummy, not a pathfinding
- * opponent -- see DEVELOPMENT.md.
+ *     rather than real ballistics, but still collision-checked, so they
+ *     abort against ceilings/floors instead of phasing through them.
  *
  * FakePlayer is also not a `Mob`, so vanilla's goal/pathfinding system
- * isn't available to it at all even in principle.
+ * isn't available to it even in principle -- it walks straight lines and
+ * auto-steps single blocks, nothing smarter.
  */
 public final class PracticeBotAi {
 
@@ -74,6 +77,8 @@ public final class PracticeBotAi {
     private static AirPhase airPhase = AirPhase.GROUND;
     private static int airTimer;
     private static EndCrystal pendingCrystal;
+    /** Our own vertical velocity, since FakePlayer never ticks its own physics. */
+    private static double verticalVelocity;
 
     private enum AirPhase { GROUND, RISING, DIVING }
 
@@ -87,6 +92,7 @@ public final class PracticeBotAi {
         airPhase = AirPhase.GROUND;
         airTimer = 0;
         pendingCrystal = null;
+        verticalVelocity = 0.0;
     }
 
     public static void tick(FakePlayer bot, Mode mode, ServerLevel level) {
@@ -108,9 +114,9 @@ public final class PracticeBotAi {
         switch (mode) {
             case SWORD -> melee(bot, target, SWORD_COOLDOWN);
             case AXE -> melee(bot, target, AXE_COOLDOWN);
-            case MACE -> maceArc(bot, target, 12, 0.55, 0.9);
-            case ELYTRA_MACE -> maceArc(bot, target, 20, 0.7, 1.0);
-            case FIREWORK_MACE -> maceArc(bot, target, 10, 1.1, 1.3);
+            case MACE -> maceArc(bot, target, 12, 0.55, 0.9, false);
+            case ELYTRA_MACE -> maceArc(bot, target, 20, 0.7, 1.0, true);
+            case FIREWORK_MACE -> maceArc(bot, target, 10, 1.1, 1.3, true);
             case DEFEND -> defend(bot, target);
             case CRYSTAL -> crystal(bot, target, level);
             default -> {
@@ -137,38 +143,60 @@ public final class PracticeBotAi {
      * time are what distinguish plain mace / elytra mace / firework mace --
      * firework is the fastest and snappiest, elytra the highest and floatiest.
      */
-    private static void maceArc(FakePlayer bot, Player target, int riseTicks, double riseSpeed, double diveSpeed) {
-        Vec3 pos = bot.position();
-        double horizontal = horizontalDistance(pos, target.position());
+    private static void maceArc(FakePlayer bot, Player target, int riseTicks, double riseSpeed, double diveSpeed, boolean glides) {
+        double horizontal = horizontalDistance(bot.position(), target.position());
 
         switch (airPhase) {
             case GROUND -> {
+                setGliding(bot, false);
                 if (horizontal > 5.0) {
                     step(bot, target, MOVE_SPEED, true);
                 } else {
                     airPhase = AirPhase.RISING;
                     airTimer = riseTicks;
+                    verticalVelocity = 0.0;
                 }
             }
             case RISING -> {
                 // Keep tracking the player horizontally on the way up so the dive lands on them.
                 trackHorizontally(bot, target, MOVE_SPEED * 0.6);
-                bot.setPos(bot.position().x, bot.position().y + riseSpeed, bot.position().z);
-                if (--airTimer <= 0) airPhase = AirPhase.DIVING;
+                // If a ceiling stops the climb, cut straight to the dive rather than
+                // grinding upward against it for the rest of the timer.
+                boolean rose = moveVertical(bot, riseSpeed);
+                if (!rose || --airTimer <= 0) {
+                    airPhase = AirPhase.DIVING;
+                    setGliding(bot, glides);
+                }
             }
             case DIVING -> {
                 trackHorizontally(bot, target, MOVE_SPEED);
-                double newY = bot.position().y - diveSpeed;
-                bot.setPos(bot.position().x, newY, bot.position().z);
-                if (newY <= target.position().y + 0.5) {
-                    bot.setPos(bot.position().x, target.position().y, bot.position().z);
+                boolean fell = moveVertical(bot, -diveSpeed);
+                boolean reachedPlayer = bot.position().y <= target.position().y + 0.5;
+                // Landing on terrain (!fell) ends the dive too, so it can't hover
+                // forever when the player is standing below an overhang.
+                if (!fell || reachedPlayer) {
                     airPhase = AirPhase.GROUND;
-                    if (attackCooldown <= 0) {
+                    verticalVelocity = 0.0;
+                    setGliding(bot, false);
+                    if (attackCooldown <= 0 && horizontalDistance(bot.position(), target.position()) <= MELEE_RANGE) {
                         swingAt(bot, target, MACE_ACCURACY);
                         attackCooldown = SWORD_COOLDOWN;
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Toggles the elytra glide pose. Shared flag 7 is the fall-flying flag
+     * (confirmed from LivingEntity#isFallFlying's bytecode); setSharedFlag is
+     * protected, opened via src/main/resources/pvpkit.accesswidener because there
+     * is no public "start gliding" entry point -- real players only reach it by
+     * sending a ServerboundPlayerCommandPacket, which a FakePlayer never does.
+     */
+    private static void setGliding(FakePlayer bot, boolean gliding) {
+        if (bot.isFallFlying() != gliding) {
+            bot.setSharedFlag(7, gliding);
         }
     }
 
@@ -231,19 +259,53 @@ public final class PracticeBotAi {
         }
     }
 
-    /** One movement step toward (or away from) the target, keeping Y pinned to the target's level. */
+    /**
+     * One collision-aware movement step toward (or away from) the target, letting
+     * gravity handle the vertical axis.
+     *
+     * Uses `Entity#move(MoverType.SELF, ...)` rather than `setPos`: move() runs
+     * vanilla's full collision resolution (so the bot walks into walls instead of
+     * clipping through them, and lands on ground instead of sinking) and updates
+     * `onGround()` as a side effect. Because FakePlayer#tick() is a no-op, nothing
+     * else applies gravity for us, so we integrate our own vertical velocity here.
+     */
     private static void step(FakePlayer bot, Player target, double speed, boolean toward) {
         Vec3 pos = bot.position();
         Vec3 dest = target.position();
         double dx = dest.x - pos.x;
         double dz = dest.z - pos.z;
         double len = Math.sqrt(dx * dx + dz * dz);
-        if (len < 1.0e-4) return;
         double sign = toward ? 1.0 : -1.0;
-        bot.setPos(pos.x + (dx / len) * speed * sign, dest.y, pos.z + (dz / len) * speed * sign);
+        double mx = len < 1.0e-4 ? 0.0 : (dx / len) * speed * sign;
+        double mz = len < 1.0e-4 ? 0.0 : (dz / len) * speed * sign;
+        moveWithGravity(bot, mx, mz);
     }
 
-    /** Horizontal-only tracking, leaving Y alone (used mid-air so it doesn't cancel the arc). */
+    /** Applies gravity + a horizontal step through vanilla collision. Also auto-steps up single blocks. */
+    private static void moveWithGravity(FakePlayer bot, double mx, double mz) {
+        if (bot.onGround()) {
+            verticalVelocity = 0.0;
+        } else {
+            verticalVelocity -= bot.getGravity();
+            if (verticalVelocity < -3.0) verticalVelocity = -3.0; // terminal velocity clamp
+        }
+
+        double beforeX = bot.position().x;
+        double beforeZ = bot.position().z;
+        bot.move(MoverType.SELF, new Vec3(mx, verticalVelocity, mz));
+
+        // If collision fully blocked the horizontal step while grounded, try a single-block
+        // step up -- otherwise the bot gets permanently stuck on any 1-high ledge, since it
+        // has no jump input of its own.
+        boolean blocked = Math.abs(bot.position().x - beforeX) < 1.0e-3
+                && Math.abs(bot.position().z - beforeZ) < 1.0e-3;
+        if (blocked && bot.onGround() && (mx != 0.0 || mz != 0.0)) {
+            bot.move(MoverType.SELF, new Vec3(0.0, 1.0, 0.0));
+            bot.move(MoverType.SELF, new Vec3(mx, 0.0, mz));
+        }
+    }
+
+    /** Horizontal-only tracking with collision, leaving the caller in charge of Y (used mid-arc). */
     private static void trackHorizontally(FakePlayer bot, Player target, double speed) {
         Vec3 pos = bot.position();
         double dx = target.position().x - pos.x;
@@ -251,7 +313,14 @@ public final class PracticeBotAi {
         double len = Math.sqrt(dx * dx + dz * dz);
         if (len < 1.0e-4) return;
         double stepLen = Math.min(speed, len);
-        bot.setPos(pos.x + (dx / len) * stepLen, pos.y, pos.z + (dz / len) * stepLen);
+        bot.move(MoverType.SELF, new Vec3((dx / len) * stepLen, 0.0, (dz / len) * stepLen));
+    }
+
+    /** Vertical-only movement with collision, for the scripted mace arc. Returns true if it actually moved. */
+    private static boolean moveVertical(FakePlayer bot, double dy) {
+        double before = bot.position().y;
+        bot.move(MoverType.SELF, new Vec3(0.0, dy, 0.0));
+        return Math.abs(bot.position().y - before) > 1.0e-3;
     }
 
     private static double horizontalDistance(Vec3 a, Vec3 b) {

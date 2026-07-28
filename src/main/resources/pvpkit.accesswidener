@@ -1,0 +1,8 @@
+accessWidener	v2	official
+
+# Entity#setSharedFlag(int, boolean) is protected; flag 7 is the fall-flying/gliding
+# flag (confirmed from LivingEntity#isFallFlying's bytecode: `bipush 7; getSharedFlag`).
+# The practice bot's elytra/firework mace modes need to set it so the wings actually
+# open mid-dive -- there is no public "start gliding" API (real players only ever get
+# there via a ServerboundPlayerCommandPacket, which a FakePlayer never sends).
+accessible	method	net/minecraft/world/entity/Entity	setSharedFlag	(IZ)V

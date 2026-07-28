@@ -9,6 +9,7 @@
 	],
 	"license": "CC0-1.0",
 	"icon": "assets/pvpkit/icon.png",
+	"accessWidener": "pvpkit.accesswidener",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
