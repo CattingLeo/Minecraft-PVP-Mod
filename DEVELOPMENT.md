@@ -167,6 +167,19 @@ All of the above are toggled from the Mod Menu config screen, not by editing cod
   repeat `/practicebot` calls just reposition/re-equip the existing tracked entity directly,
   since normal per-tick entity sync picks up the moved position on its own without needing to
   re-add it.
+- **Second real bug, found after the threading fix**: the command ran without error and the
+  entity WAS added server-side, but nothing appeared client-side. Confirmed via
+  `latest.log`: `Server attempted to add player prior to sending player info` immediately
+  followed by `Skipping Entity with id entity.minecraft.player` -- the client explicitly
+  discards any player-type entity add if it hasn't already been told that UUID's GameProfile.
+  A real player normally gets this via `PlayerList#placeNewPlayer`'s join sequence; a
+  `FakePlayer` never goes through that. Fixed by broadcasting
+  `ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(newBot))` via
+  `server.getPlayerList().broadcastAll(...)` right before `addFreshEntity`, the first time
+  only (not on reposition calls, since the client already has the profile by then) -- this
+  is the same "here's a brand-new player: profile, skin, gamemode, listed" packet
+  `placeNewPlayer` itself sends, just replicated manually since the FakePlayer bypasses that
+  path entirely.
 - **Scope**: singleplayer / world-host only. `Minecraft#getSingleplayerServer()` is null for
   anyone who only joined someone else's world (no server authority from the client side in that
   case) -- see the README's Commands section for the player-facing version of this limit.

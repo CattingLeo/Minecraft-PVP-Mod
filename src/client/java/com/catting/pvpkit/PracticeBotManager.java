@@ -1,6 +1,7 @@
 package com.catting.pvpkit;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 import com.mojang.authlib.GameProfile;
@@ -19,6 +20,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -154,6 +156,14 @@ public final class PracticeBotManager {
             newBot.setCustomNameVisible(true);
 
             if (!alreadyTracked) {
+                // A player-type entity is silently discarded client-side ("Skipping
+                // Entity with id entity.minecraft.player") if the client hasn't
+                // already been told this UUID's GameProfile -- normally sent by
+                // PlayerList#placeNewPlayer during a real player's join, which this
+                // FakePlayer never goes through. createPlayerInitializing replicates
+                // that same initial-info packet (profile, skin, gamemode, listed
+                // status) so the client accepts the entity when it arrives right after.
+                server.getPlayerList().broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(newBot)));
                 level.addFreshEntity(newBot);
             }
             bot = newBot;
