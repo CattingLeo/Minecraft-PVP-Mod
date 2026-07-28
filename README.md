@@ -102,8 +102,22 @@ Independent sandbox toggles, plus the original three-way cooldown-removal mode:
 
 - **`/practicebot`** — summons a full-netherite (Protection IV, Unbreaking III, Mending),
   unkillable combat dummy standing exactly where you are, wearing your own name and skin.
-- **`/practicebot shield`** — same, but it holds its shield up permanently.
 - **`/practicebot remove`** — despawns it.
+
+Combat modes (each re-summons the bot in that mode, swapping to the right gear):
+
+| Command | Behaviour |
+|---|---|
+| **`/practicebot shield`** | Stands still holding its shield up |
+| **`/practicebot sword`** | Chases you and swings a netherite sword on a ~0.6s rhythm |
+| **`/practicebot axe`** | Same, with a netherite axe on the slower ~1s axe rhythm |
+| **`/practicebot mace`** | Closes in, launches straight up, then dives onto you with a mace — deliberately **75% accurate**, so it misses sometimes |
+| **`/practicebot elytra mace`** | Mace dive, but higher and floatier, wearing an elytra instead of a chestplate |
+| **`/practicebot firework mace`** | Mace dive with a much faster, snappier rocket-boosted arc |
+| **`/practicebot defend`** | Backs away from you, and backs off harder when you're airborne or holding a mace |
+| **`/practicebot crystal`** | Places obsidian beside you, puts an end crystal on it, then detonates it |
+
+Whatever mode it was in is remembered across world rejoins along with its position.
 
 **Singleplayer / world-host only.** Spawning a real, hittable entity needs server
 authority, and this mod is client-side only — it only has that authority when you're

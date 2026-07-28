@@ -190,6 +190,34 @@ All of the above are toggled from the Mod Menu config screen, not by editing cod
 - **Scope**: singleplayer / world-host only. `Minecraft#getSingleplayerServer()` is null for
   anyone who only joined someone else's world (no server authority from the client side in that
   case) -- see the README's Commands section for the player-facing version of this limit.
+- **Combat modes** (`PracticeBotAi`, one `Mode` active at a time, ticked from the manager's
+  `END_SERVER_TICK` hook so it's already on the server thread): sword / axe / mace / elytra
+  mace / firework mace / defend / crystal / shield, plus idle. Mode is persisted in
+  `PracticeBotState` and restored on rejoin along with position.
+  - **THE constraint that shapes all of this**: `FakePlayer#tick()` is a literal no-op --
+    confirmed from the Fabric API bytecode, the method body is just `return`. So the bot has
+    **no gravity, no collision, no `setDeltaMovement` response, and no attack-strength ticker
+    recovery**. Everything is therefore hand-driven: movement is manual `setPos` stepping (not
+    velocity), attack pacing uses our own tick counters (NOT `getAttackStrengthScale`, which
+    would stay pinned after the first `resetAttackStrengthTicker` and never recharge), and the
+    mace "launch and dive" is a scripted three-phase arc rather than real ballistics.
+    `FakePlayer` is also not a `Mob`, so vanilla's goal/pathfinding system isn't available to
+    it even in principle.
+  - **Known consequences of that**: with no collision the bot clips through terrain while
+    chasing, and it pins its Y to the player's rather than genuinely falling (so it snaps
+    upward if you jump). It's a sparring dummy, not a pathfinding opponent.
+  - **Mace accuracy** is deliberately 75% (`MACE_ACCURACY`) -- `swingAt()` always plays the
+    swing animation but only calls `Player#attack` on a passing roll, so misses look like real
+    whiffs rather than the bot freezing.
+  - **Crystal mode** places obsidian via `Level#setBlockAndUpdate`, spawns an
+    `EndCrystal(Level, x, y, z)` on top, then detonates it on the *next* pass by calling
+    `Player#attack` on it -- routing through vanilla's real damage path, so the explosion and
+    its damage to the player are genuine rather than simulated.
+  - **Elytra/firework modes** equip a real elytra in the chest slot so it's visible on the
+    bot's back, but the actual glide *animation* won't play: starting a glide needs
+    `Entity#setSharedFlag(7, true)`, which is `protected` and would require a mixin accessor or
+    an access widener. Deliberately not done -- the flight is delta-driven anyway, so the
+    accessor would buy only the wing-open pose in exchange for a new required-mixin crash risk.
 - **Doesn't survive a world rejoin on its own** -- `Player#shouldBeSaved()` unconditionally
   returns `false` (confirmed from the actual bytecode: `iconst_0; ireturn`), which excludes
   every player-type entity, `FakePlayer` included, from vanilla's normal per-chunk entity

@@ -101,33 +101,44 @@ public final class PracticeBotManager {
             UUID.nameUUIDFromBytes("pvpkit:practicebot".getBytes(StandardCharsets.UTF_8));
 
     private static FakePlayer bot;
-    private static boolean shieldMode;
+    private static PracticeBotAi.Mode mode = PracticeBotAi.Mode.IDLE;
 
     private PracticeBotManager() {
     }
 
     public static void init() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> dispatcher.register(
-                ClientCommands.literal("practicebot")
-                        .executes(ctx -> summon(ctx.getSource(), false))
-                        .then(ClientCommands.literal("shield").executes(ctx -> summon(ctx.getSource(), true)))
-                        .then(ClientCommands.literal("remove").executes(PracticeBotManager::remove))));
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
+            var root = ClientCommands.literal("practicebot")
+                    .executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.IDLE))
+                    .then(ClientCommands.literal("remove").executes(PracticeBotManager::remove));
+            // One subcommand per mode, named from its label ("elytra mace" ->
+            // /practicebot elytra mace, i.e. nested literals).
+            root = root.then(ClientCommands.literal("shield").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.SHIELD)));
+            root = root.then(ClientCommands.literal("sword").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.SWORD)));
+            root = root.then(ClientCommands.literal("axe").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.AXE)));
+            root = root.then(ClientCommands.literal("defend").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.DEFEND)));
+            root = root.then(ClientCommands.literal("crystal").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.CRYSTAL)));
+            root = root.then(ClientCommands.literal("mace")
+                    .executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.MACE)));
+            root = root.then(ClientCommands.literal("elytra")
+                    .then(ClientCommands.literal("mace").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.ELYTRA_MACE))));
+            root = root.then(ClientCommands.literal("firework")
+                    .then(ClientCommands.literal("mace").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.FIREWORK_MACE))));
+            dispatcher.register(root);
+        });
 
-        // Keeps the shield raised every server tick rather than a one-shot call,
-        // since startUsingItem() only needs to fire again if something (e.g. use
-        // duration lapsing) ever drops it back out of the "using item" state.
-        // Already runs on the server thread (this event fires there), so no
-        // server.execute() hop needed here.
+        // Runs on the server thread already (this event fires there), so no
+        // server.execute() hop needed.
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (bot != null && shieldMode && bot.isAlive() && !bot.isUsingItem()) {
-                bot.startUsingItem(InteractionHand.OFF_HAND);
-            }
+            if (bot == null || !bot.isAlive()) return;
+            ServerLevel level = (ServerLevel) bot.level();
+            PracticeBotAi.tick(bot, mode, level);
         });
 
         ServerLifecycleEvents.SERVER_STARTED.register(PracticeBotManager::restoreOnServerStart);
     }
 
-    private static int summon(FabricClientCommandSource source, boolean shield) {
+    private static int summon(FabricClientCommandSource source, PracticeBotAi.Mode requested) {
         Minecraft mc = source.getClient();
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null) {
@@ -143,13 +154,15 @@ public final class PracticeBotManager {
         GameProfile real = mc.getGameProfile();
         Vec3 spawnPos = player.position();
         float yaw = player.getYRot() + 180.0f;
-        Component doneMessage = Component.literal(shield ? "Practice bot summoned -- shield up." : "Practice bot summoned.");
+        Component doneMessage = Component.literal(requested == PracticeBotAi.Mode.IDLE
+                ? "Practice bot summoned."
+                : "Practice bot summoned -- mode: " + requested.label + ".");
 
-        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, shield,
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, requested,
                 () -> {
                     PracticeBotState state = PracticeBotState.get();
                     state.active = true;
-                    state.shield = shield;
+                    state.mode = requested.name();
                     state.dimension = dimension.identifier().toString();
                     state.x = spawnPos.x;
                     state.y = spawnPos.y;
@@ -170,17 +183,23 @@ public final class PracticeBotManager {
         GameProfile real = mc.getGameProfile();
         ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(state.dimension));
         Vec3 spawnPos = new Vec3(state.x, state.y, state.z);
-        boolean shield = state.shield;
+        PracticeBotAi.Mode saved;
+        try {
+            saved = PracticeBotAi.Mode.valueOf(state.mode);
+        } catch (IllegalArgumentException e) {
+            saved = PracticeBotAi.Mode.IDLE; // unknown/renamed mode in the json -- degrade quietly
+        }
+        PracticeBotAi.Mode restored = saved;
         float yaw = state.yaw;
 
-        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, shield,
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, restored,
                 () -> { /* silent -- this runs automatically, not from a command the player typed */ },
                 error -> { /* nothing to report an error to here either */ }));
     }
 
     /** Actual entity creation/equip/positioning, shared by the command path and the world-load restore path. Must run inside server.execute(...). */
     private static void performSummon(MinecraftServer server, ResourceKey<Level> dimension, GameProfile real,
-                                       Vec3 spawnPos, float yaw, boolean shield,
+                                       Vec3 spawnPos, float yaw, PracticeBotAi.Mode requested,
                                        Runnable onSuccess, Consumer<Component> onError) {
         ServerLevel level = server.getLevel(dimension);
         if (level == null) {
@@ -194,10 +213,23 @@ public final class PracticeBotManager {
 
         RegistryAccess registries = level.registryAccess();
         newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));
-        newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE));
         newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS));
         newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS));
-        newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
+        // The flying mace modes wear an elytra instead of the chestplate, so it's
+        // visible on its back mid-dive (the glide animation itself won't play --
+        // that needs a non-public gliding flag; see DEVELOPMENT.md).
+        boolean flying = requested == PracticeBotAi.Mode.ELYTRA_MACE || requested == PracticeBotAi.Mode.FIREWORK_MACE;
+        newBot.setItemSlot(EquipmentSlot.CHEST, flying
+                ? gear(registries, Items.ELYTRA, new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1))
+                : armor(registries, Items.NETHERITE_CHESTPLATE));
+
+        Item weapon = switch (requested) {
+            case AXE -> Items.NETHERITE_AXE;
+            case MACE, ELYTRA_MACE, FIREWORK_MACE -> Items.MACE;
+            case CRYSTAL -> Items.END_CRYSTAL;
+            default -> Items.NETHERITE_SWORD;
+        };
+        newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, weapon,
                 new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
         newBot.setItemSlot(EquipmentSlot.OFFHAND, gear(registries, Items.SHIELD,
                 new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
@@ -214,7 +246,8 @@ public final class PracticeBotManager {
             level.addFreshEntity(newBot);
         }
         bot = newBot;
-        shieldMode = shield;
+        mode = requested;
+        PracticeBotAi.reset(); // don't inherit a half-finished mace arc across a mode switch
         onSuccess.run();
     }
 
@@ -232,7 +265,8 @@ public final class PracticeBotManager {
                 bot.discard();
             }
             bot = null;
-            shieldMode = false;
+            mode = PracticeBotAi.Mode.IDLE;
+            PracticeBotAi.reset();
             PracticeBotState.get().active = false;
             PracticeBotState.save();
             mc.execute(() -> source.sendFeedback(Component.literal("Practice bot removed.")));

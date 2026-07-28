@@ -27,7 +27,8 @@ import net.fabricmc.loader.api.FabricLoader;
 public class PracticeBotState {
 
     public boolean active = false;
-    public boolean shield = false;
+    /** PracticeBotAi.Mode name(); string rather than the enum so an unknown/renamed value degrades to IDLE instead of breaking the whole file. */
+    public String mode = "IDLE";
     public String dimension = "minecraft:overworld";
     public double x;
     public double y;
@@ -54,6 +55,7 @@ public class PracticeBotState {
         }
         if (instance == null) instance = new PracticeBotState();
         if (instance.dimension == null) instance.dimension = "minecraft:overworld";
+        if (instance.mode == null) instance.mode = "IDLE";
     }
 
     public static void save() {
