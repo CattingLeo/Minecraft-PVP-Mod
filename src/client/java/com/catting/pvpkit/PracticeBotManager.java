@@ -25,6 +25,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -151,7 +153,14 @@ public final class PracticeBotManager {
 
             newBot.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
             newBot.setYRot(yaw);
-            newBot.setInvulnerable(true);
+            // Deliberately NOT setInvulnerable(true) -- that skips the entire vanilla
+            // hurt pipeline, including knockback (applied in the same call), which is
+            // why hits and wind burst did nothing. Resistance 255 + Regeneration II is
+            // the classic "effectively unkillable but still a real, hittable, knocked-
+            // back combat participant" combo instead -- real hit reactions/knockback/
+            // sounds, just never actually dies.
+            newBot.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, Integer.MAX_VALUE, 255, false, false, false));
+            newBot.addEffect(new MobEffectInstance(MobEffects.REGENERATION, Integer.MAX_VALUE, 1, false, false, false));
             newBot.setCustomName(nameTag);
             newBot.setCustomNameVisible(true);
 

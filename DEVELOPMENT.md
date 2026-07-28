@@ -144,9 +144,16 @@ All of the above are toggled from the Mod Menu config screen, not by editing cod
   `ResourceKey#identifier()`, not `.location()` — verify against the actual class before
   assuming a name here, it's changed before), then written to the stack via
   `stack.set(DataComponents.ENCHANTMENTS, ...)`.
-- **Invulnerable**: `Entity#setInvulnerable(true)` — skips vanilla's damage pipeline entirely
-  (and, since knockback is applied as part of the same hurt call, effectively also skips
-  knockback, so it doesn't get shoved around by hits either).
+- **"Unkillable"**: NOT `Entity#setInvulnerable(true)` (tried first, reverted) -- that skips
+  vanilla's damage pipeline entirely, and since knockback is applied as part of the same hurt
+  call, it also silently ate all knockback, making the bot useless for practice (no hit
+  reactions, wind burst did nothing). Uses `MobEffectInstance(MobEffects.RESISTANCE,
+  Integer.MAX_VALUE, 255, ...)` + `MobEffectInstance(MobEffects.REGENERATION,
+  Integer.MAX_VALUE, 1, ...)` instead -- the classic "effectively unkillable" combo (amplifier
+  255 is the well-known "resistance to everything" value from `/effect give`) that still runs
+  through the real hurt/knockback pipeline, so hits, knockback, and wind burst all behave
+  normally; the bot just never actually dies. `Integer.MAX_VALUE` duration rather than a
+  tick-based top-up loop, since ticks-until-expiry at that value is on the order of centuries.
 - **Shield mode**: each server tick, if not already `isUsingItem()`, calls
   `startUsingItem(InteractionHand.OFF_HAND)` — shield-blocking is a generic `LivingEntity`
   mechanic in vanilla, not player-specific, so this works on a non-player-controlled entity the
