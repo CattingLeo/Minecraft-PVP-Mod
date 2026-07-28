@@ -154,8 +154,14 @@ public class PvpKitModMenu implements ModMenuApi {
                             + "toggles here, attacks are client-initiated and DO work on servers you "
                             + "don't host -- keep this to private worlds / LAN with friends."))
                     .setSaveConsumer(v -> nc.killAura = v).build());
-            noCooldown.addEntry(e.startIntSlider(Component.literal("Kill Aura range (blocks)"), nc.killAuraRange, 2, 6)
-                    .setDefaultValue(3).setSaveConsumer(v -> nc.killAuraRange = v).build());
+            noCooldown.addEntry(e.startIntSlider(Component.literal("Kill Aura range (blocks)"), nc.killAuraRange, 2, 10)
+                    .setDefaultValue(3)
+                    .setTooltip(Component.literal(
+                            "How far away a target can be picked. NOTE: this only widens target "
+                            + "SELECTION -- the server independently validates attack distance "
+                            + "against your interaction-range attribute (~3 blocks) and rejects "
+                            + "anything past it, so values well above that won't actually land hits."))
+                    .setSaveConsumer(v -> nc.killAuraRange = v).build());
             noCooldown.addEntry(e.startEnumSelector(Component.literal("Kill Aura targets"),
                             NoCooldownConfig.KillAuraTargets.class, nc.killAuraTargets)
                     .setDefaultValue(NoCooldownConfig.KillAuraTargets.PLAYERS)
