@@ -112,6 +112,9 @@ world instead of hosting, you can't summon your own bot there — but if *they* 
 one in their world, you can absolutely fight it once it's up, since it's a real entity
 synced to everyone normally.
 
+If one was active when you last quit, it comes back automatically (same spot, same
+shield mode) the next time you load that world — no need to type the command again.
+
 ## Fair use
 
 This mod's design draws a hard line between two categories:

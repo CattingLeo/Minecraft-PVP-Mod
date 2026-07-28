@@ -3,6 +3,7 @@ package com.catting.pvpkit;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.PropertyMap;
@@ -12,6 +13,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.entity.FakePlayer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
@@ -21,6 +23,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -38,13 +41,13 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * /practicebot -- summons a full-netherite, unkillable combat dummy wearing
- * your own name and skin, standing exactly where you're standing (via
- * Fabric API's FakePlayer, a real ServerPlayer-derived entity with a
- * working stand-in network listener -- not a genuine connected player, and
- * not something this mod built from scratch: FakePlayer is Fabric API's own
- * sanctioned tool for exactly this, already a transitive dependency via
- * fabric-events-interaction-v0).
+ * /practicebot -- summons a full-netherite, effectively-unkillable combat
+ * dummy wearing your own name and skin, standing exactly where you're
+ * standing (via Fabric API's FakePlayer, a real ServerPlayer-derived entity
+ * with a working stand-in network listener -- not a genuine connected
+ * player, and not something this mod built from scratch: FakePlayer is
+ * Fabric API's own sanctioned tool for exactly this, already a transitive
+ * dependency via fabric-events-interaction-v0).
  * /practicebot shield makes it hold its shield up permanently.
  * /practicebot remove despawns it.
  *
@@ -58,28 +61,39 @@ import net.minecraft.world.phys.Vec3;
  * just can't summon their own from their side.
  *
  * All world/entity mutation runs inside server.execute(...), NOT directly
- * on the client/render thread the command handler fires on. The first
- * version skipped this and called ServerLevel#addFreshEntity directly from
- * the command callback; even in singleplayer the integrated server runs on
- * its own thread, and C2ME's threading-safety mixin (one of this user's
- * other installed mods) correctly threw ConcurrentModificationException
- * ("Async entity load") for the illegal cross-thread chunk/entity access --
- * the bot never actually finished being added, which is why it never
- * appeared. Client-only values needed inside the server task (profile,
- * exact spawn position/yaw) are captured as local final data before the
- * hop, and feedback messages are hopped back via mc.execute(...) rather
- * than sent directly from the server thread.
+ * on the client/render thread the command handler fires on -- even in
+ * singleplayer the integrated server runs on its own thread, and C2ME's
+ * threading-safety mixin (one of this user's other installed mods)
+ * correctly throws ConcurrentModificationException ("Async entity load")
+ * for an illegal cross-thread chunk/entity add otherwise.
  *
  * Uses a fixed synthetic UUID (nameUUIDFromBytes, NOT your real account
  * UUID -- two entities can never share one) so repeat /practicebot calls
  * reuse and reposition the same FakePlayer instance rather than piling up
  * duplicates: Fabric caches FakePlayer.get() results keyed by (level,
  * profile). addFreshEntity is only called when the bot isn't already
- * tracked in that level (checked via Level#getEntity(UUID)) -- calling it
- * again on an already-tracked entity logs "UUID of added entity already
- * exists" and does nothing, so repositioning instead just mutates the
- * existing entity directly (normal per-tick entity sync picks up the
- * moved position on its own).
+ * tracked in that level (checked via Level#getEntity(UUID)).
+ *
+ * A player-type entity is silently discarded client-side ("Skipping Entity
+ * with id entity.minecraft.player") if the client hasn't already been told
+ * this UUID's GameProfile -- normally sent by PlayerList#placeNewPlayer
+ * during a real player's join, which this FakePlayer never goes through.
+ * ClientboundPlayerInfoUpdatePacket.createPlayerInitializing replicates
+ * that same initial-info packet so the client accepts the entity.
+ *
+ * Not setInvulnerable(true) -- that skips the entire vanilla hurt pipeline,
+ * including knockback (applied in the same call), which made hits and wind
+ * burst do nothing. Resistance 255 + Regeneration II instead: real hit
+ * reactions/knockback/sounds through the normal pipeline, it just never
+ * actually dies.
+ *
+ * The bot does NOT survive a world rejoin on its own -- Player#shouldBeSaved()
+ * unconditionally returns false (verified in the class bytecode), excluding
+ * every player-type entity, FakePlayer included, from normal chunk-based
+ * saving; combined with FakePlayer's own cache being purely in-memory, the
+ * whole entity is gone after a restart, not just its effects. PracticeBotState
+ * persists whether one was active (and where) to config/practicebot.json,
+ * and the SERVER_STARTED listener below re-summons it automatically.
  */
 public final class PracticeBotManager {
 
@@ -109,6 +123,8 @@ public final class PracticeBotManager {
                 bot.startUsingItem(InteractionHand.OFF_HAND);
             }
         });
+
+        ServerLifecycleEvents.SERVER_STARTED.register(PracticeBotManager::restoreOnServerStart);
     }
 
     private static int summon(FabricClientCommandSource source, boolean shield) {
@@ -125,62 +141,81 @@ public final class PracticeBotManager {
         var player = source.getPlayer();
         ResourceKey<Level> dimension = source.getLevel().dimension();
         GameProfile real = mc.getGameProfile();
-        GameProfile fake = new GameProfile(BOT_UUID, real.name(), new PropertyMap(real.properties()));
         Vec3 spawnPos = player.position();
         float yaw = player.getYRot() + 180.0f;
-        Component nameTag = Component.literal(real.name() + "'s Practice Bot");
         Component doneMessage = Component.literal(shield ? "Practice bot summoned -- shield up." : "Practice bot summoned.");
 
-        server.execute(() -> {
-            ServerLevel level = server.getLevel(dimension);
-            if (level == null) {
-                mc.execute(() -> source.sendError(Component.literal("Couldn't find your current dimension server-side.")));
-                return;
-            }
-
-            FakePlayer newBot = FakePlayer.get(level, fake);
-            boolean alreadyTracked = level.getEntity(BOT_UUID) != null;
-
-            RegistryAccess registries = level.registryAccess();
-            newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));
-            newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE));
-            newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS));
-            newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS));
-            newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
-                    new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
-            newBot.setItemSlot(EquipmentSlot.OFFHAND, gear(registries, Items.SHIELD,
-                    new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
-
-            newBot.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
-            newBot.setYRot(yaw);
-            // Deliberately NOT setInvulnerable(true) -- that skips the entire vanilla
-            // hurt pipeline, including knockback (applied in the same call), which is
-            // why hits and wind burst did nothing. Resistance 255 + Regeneration II is
-            // the classic "effectively unkillable but still a real, hittable, knocked-
-            // back combat participant" combo instead -- real hit reactions/knockback/
-            // sounds, just never actually dies.
-            newBot.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, Integer.MAX_VALUE, 255, false, false, false));
-            newBot.addEffect(new MobEffectInstance(MobEffects.REGENERATION, Integer.MAX_VALUE, 1, false, false, false));
-            newBot.setCustomName(nameTag);
-            newBot.setCustomNameVisible(true);
-
-            if (!alreadyTracked) {
-                // A player-type entity is silently discarded client-side ("Skipping
-                // Entity with id entity.minecraft.player") if the client hasn't
-                // already been told this UUID's GameProfile -- normally sent by
-                // PlayerList#placeNewPlayer during a real player's join, which this
-                // FakePlayer never goes through. createPlayerInitializing replicates
-                // that same initial-info packet (profile, skin, gamemode, listed
-                // status) so the client accepts the entity when it arrives right after.
-                server.getPlayerList().broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(newBot)));
-                level.addFreshEntity(newBot);
-            }
-            bot = newBot;
-            shieldMode = shield;
-
-            mc.execute(() -> source.sendFeedback(doneMessage));
-        });
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, shield,
+                () -> {
+                    PracticeBotState state = PracticeBotState.get();
+                    state.active = true;
+                    state.shield = shield;
+                    state.dimension = dimension.identifier().toString();
+                    state.x = spawnPos.x;
+                    state.y = spawnPos.y;
+                    state.z = spawnPos.z;
+                    state.yaw = yaw;
+                    PracticeBotState.save();
+                    mc.execute(() -> source.sendFeedback(doneMessage));
+                },
+                error -> mc.execute(() -> source.sendError(error))));
         return 1;
+    }
+
+    /** Re-summons the bot on world load if one was active when you last quit -- see class javadoc. */
+    private static void restoreOnServerStart(MinecraftServer server) {
+        PracticeBotState state = PracticeBotState.get();
+        if (!state.active) return;
+        Minecraft mc = Minecraft.getInstance();
+        GameProfile real = mc.getGameProfile();
+        ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(state.dimension));
+        Vec3 spawnPos = new Vec3(state.x, state.y, state.z);
+        boolean shield = state.shield;
+        float yaw = state.yaw;
+
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, shield,
+                () -> { /* silent -- this runs automatically, not from a command the player typed */ },
+                error -> { /* nothing to report an error to here either */ }));
+    }
+
+    /** Actual entity creation/equip/positioning, shared by the command path and the world-load restore path. Must run inside server.execute(...). */
+    private static void performSummon(MinecraftServer server, ResourceKey<Level> dimension, GameProfile real,
+                                       Vec3 spawnPos, float yaw, boolean shield,
+                                       Runnable onSuccess, Consumer<Component> onError) {
+        ServerLevel level = server.getLevel(dimension);
+        if (level == null) {
+            onError.accept(Component.literal("Couldn't find that dimension server-side."));
+            return;
+        }
+
+        GameProfile fake = new GameProfile(BOT_UUID, real.name(), new PropertyMap(real.properties()));
+        FakePlayer newBot = FakePlayer.get(level, fake);
+        boolean alreadyTracked = level.getEntity(BOT_UUID) != null;
+
+        RegistryAccess registries = level.registryAccess();
+        newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));
+        newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE));
+        newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS));
+        newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS));
+        newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
+                new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
+        newBot.setItemSlot(EquipmentSlot.OFFHAND, gear(registries, Items.SHIELD,
+                new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
+
+        newBot.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
+        newBot.setYRot(yaw);
+        newBot.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, Integer.MAX_VALUE, 255, false, false, false));
+        newBot.addEffect(new MobEffectInstance(MobEffects.REGENERATION, Integer.MAX_VALUE, 1, false, false, false));
+        newBot.setCustomName(Component.literal(real.name() + "'s Practice Bot"));
+        newBot.setCustomNameVisible(true);
+
+        if (!alreadyTracked) {
+            server.getPlayerList().broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(newBot)));
+            level.addFreshEntity(newBot);
+        }
+        bot = newBot;
+        shieldMode = shield;
+        onSuccess.run();
     }
 
     private static int remove(CommandContext<FabricClientCommandSource> ctx) {
@@ -198,6 +233,8 @@ public final class PracticeBotManager {
             }
             bot = null;
             shieldMode = false;
+            PracticeBotState.get().active = false;
+            PracticeBotState.save();
             mc.execute(() -> source.sendFeedback(Component.literal("Practice bot removed.")));
         });
         return 1;

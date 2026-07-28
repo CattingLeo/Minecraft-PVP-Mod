@@ -190,6 +190,19 @@ All of the above are toggled from the Mod Menu config screen, not by editing cod
 - **Scope**: singleplayer / world-host only. `Minecraft#getSingleplayerServer()` is null for
   anyone who only joined someone else's world (no server authority from the client side in that
   case) -- see the README's Commands section for the player-facing version of this limit.
+- **Doesn't survive a world rejoin on its own** -- `Player#shouldBeSaved()` unconditionally
+  returns `false` (confirmed from the actual bytecode: `iconst_0; ireturn`), which excludes
+  every player-type entity, `FakePlayer` included, from vanilla's normal per-chunk entity
+  saving (real players are saved via a completely separate playerdata-file system tied to an
+  actual login, which a `FakePlayer` never goes through). Combined with `FakePlayer`'s own
+  cache (`FAKE_PLAYER_MAP`) being purely in-memory and rebuilt empty on every server start, the
+  whole entity is gone after quitting -- not just its effects. `PracticeBotState`
+  (`config/practicebot.json`) persists whether one was active, its position/dimension/yaw, and
+  shield mode; `summon()` and `remove()` both keep it in sync, and `performSummon()` was
+  factored out of `summon()` so a `ServerLifecycleEvents.SERVER_STARTED` listener can call the
+  exact same entity-creation path to auto-restore it (using the freshly-fetched current
+  `Minecraft#getGameProfile()` for the skin, since that could theoretically differ session to
+  session, but the saved position/dimension/yaw/shield-mode from last time).
 
 ## Build
 Requires JDK 25.
