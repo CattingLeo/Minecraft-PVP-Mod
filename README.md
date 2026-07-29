@@ -70,6 +70,13 @@ toggle, on by default).
 - **Hotbar swap crosshair flash** — the crosshair flashes green every time you switch
   hotbar slots, using the same flash mechanism as the (red) cooldown-ready flash above.
 
+### Freecam
+Detaches the view from your body so you can fly the camera around freely while your
+player stands frozen in place. WASD to move, space/shift for up/down, sprint to go
+faster; mouse look works as normal. Unbound by default — set **Toggle Freecam** under
+Options → Controls → Key Binds → PvP Kit. Since it sees through walls, it's in the
+same private-world/LAN category as the Locator — see [Fair use](#fair-use).
+
 ### Locator
 A fancy arrow slides along the screen edge, pointing toward your nearest other player,
 with a live distance readout. Hides automatically once you have genuine line of sight

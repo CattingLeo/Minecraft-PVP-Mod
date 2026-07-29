@@ -71,6 +71,7 @@ public final class PvpKitKeybinds {
     private static final KeyMapping TOGGLE_AUTO_TOTEM = bind("toggle_auto_totem");
     private static final KeyMapping TOGGLE_AUTO_EAT = bind("toggle_auto_eat");
     private static final KeyMapping TOGGLE_CRITICALS = bind("toggle_criticals");
+    private static final KeyMapping TOGGLE_FREECAM = bind("toggle_freecam");
     // Deliberately bound by default (every other keybind in this mod starts
     // unbound) -- this one was specifically requested as a Right Shift toggle.
     private static final KeyMapping TOGGLE_MODULE_HUD = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -137,6 +138,7 @@ public final class PvpKitKeybinds {
         while (TOGGLE_AUTO_TOTEM.consumeClick()) toggle(c -> c.autoTotem = !c.autoTotem);
         while (TOGGLE_AUTO_EAT.consumeClick()) toggle(c -> c.autoEat = !c.autoEat);
         while (TOGGLE_CRITICALS.consumeClick()) toggle(c -> c.criticals = !c.criticals);
+        while (TOGGLE_FREECAM.consumeClick()) FreecamManager.toggle();
         while (TOGGLE_MODULE_HUD.consumeClick()) toggle(c -> c.moduleHud = !c.moduleHud);
 
         if (recording) {

@@ -203,6 +203,7 @@ public class PvpKitClient implements ClientModInitializer {
         applyConfig();
         PvpKitKeybinds.register();
         PracticeBotManager.init();
+        FreecamManager.init();
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientEntityEvents.ENTITY_LOAD.register((entity, world) -> {
@@ -443,6 +444,7 @@ public class PvpKitClient implements ClientModInitializer {
         if (AUTO_TOTEM) active.add("Auto Totem");
         if (AUTO_EAT) active.add("Auto Eat");
         if (CRITICALS) active.add("Criticals");
+        if (FreecamManager.isActive()) active.add("Freecam");
         if (nc.mode != NoCooldownConfig.Mode.DISABLED) active.add(nc.mode.label);
         if (nc.unlimitedDurability) active.add("Unlimited Durability");
         if (nc.instantUse) active.add("Instant Use");
