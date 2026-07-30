@@ -55,6 +55,7 @@ public class PvpKitConfig {
     public boolean cooldownFlash = true;
     public boolean showHitMarker = true;
     public boolean hotbarSwapFlash = true;
+    public boolean disableScrollHotbar = false;
 
     // --- Utility (see PvpKitClient javadoc for how each one works) ---
     public boolean autoTotem = false;

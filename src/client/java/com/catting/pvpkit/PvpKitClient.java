@@ -73,6 +73,7 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean COOLDOWN_FLASH = true;
     public static boolean SHOW_HIT_MARKER = true;
     public static boolean HOTBAR_SWAP_FLASH = true;
+    public static boolean DISABLE_SCROLL_HOTBAR = false;
 
     // ---- Utility (Auto Totem / Auto Eat / Criticals / module HUD) ----
     public static boolean AUTO_TOTEM = false;
@@ -97,7 +98,7 @@ public class PvpKitClient implements ClientModInitializer {
         LOCATOR_SHOW_THROUGH_WALLS = c.locatorShowThroughWalls;
         NO_CRYSTAL_EXPLOSION = c.noCrystalExplosion; COOLDOWN_FLASH = c.cooldownFlash;
         SHOW_HIT_MARKER = c.showHitMarker;
-        HOTBAR_SWAP_FLASH = c.hotbarSwapFlash;
+        HOTBAR_SWAP_FLASH = c.hotbarSwapFlash; DISABLE_SCROLL_HOTBAR = c.disableScrollHotbar;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
         CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
     }

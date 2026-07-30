@@ -81,6 +81,12 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(true).setSaveConsumer(v -> c.cooldownFlash = v).build());
             combat.addEntry(e.startBooleanToggle(Component.literal("Hit marker on landing a hit"), c.showHitMarker)
                     .setDefaultValue(true).setSaveConsumer(v -> c.showHitMarker = v).build());
+            combat.addEntry(e.startBooleanToggle(Component.literal("Disable scroll-wheel hotbar switching"), c.disableScrollHotbar)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal(
+                            "Stops the scroll wheel from changing your hotbar slot, freeing it up for other uses. "
+                            + "GUI/inventory/chat scrolling is unaffected."))
+                    .setSaveConsumer(v -> c.disableScrollHotbar = v).build());
             combat.addEntry(e.startBooleanToggle(Component.literal("Hotbar swap crosshair flash"), c.hotbarSwapFlash)
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("The crosshair flashes green every time you switch hotbar slots -- same mechanism as the red cooldown flash above."))
