@@ -236,7 +236,18 @@ public final class PracticeBotManager {
 
         newBot.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
         newBot.setYRot(yaw);
-        newBot.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, Integer.MAX_VALUE, 255, false, false, false));
+        // Deliberately NO Resistance. Amplifier 255 reduces incoming damage to a flat
+        // zero, which also suppresses knockback and hit reactions -- functionally
+        // identical to the setInvulnerable(true) it was supposed to replace, and the
+        // reason hits felt like they weren't landing. Survivability is handled instead
+        // by PracticeBotAi#keepHittable topping health up after real damage lands.
+        //
+        // Explicitly stripped rather than just not re-added: FakePlayer.get() returns a
+        // CACHED instance per (level, profile), so a bot summoned by an older build is
+        // still carrying Resistance 255 and would stay unhittable through this fix.
+        // Same reason invulnerable is cleared -- older builds set that too.
+        newBot.removeEffect(MobEffects.RESISTANCE);
+        newBot.setInvulnerable(false);
         newBot.addEffect(new MobEffectInstance(MobEffects.REGENERATION, Integer.MAX_VALUE, 1, false, false, false));
         newBot.setCustomName(Component.literal(real.name() + "'s Practice Bot"));
         newBot.setCustomNameVisible(true);

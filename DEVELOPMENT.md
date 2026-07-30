@@ -144,16 +144,25 @@ All of the above are toggled from the Mod Menu config screen, not by editing cod
   `ResourceKey#identifier()`, not `.location()` — verify against the actual class before
   assuming a name here, it's changed before), then written to the stack via
   `stack.set(DataComponents.ENCHANTMENTS, ...)`.
-- **"Unkillable"**: NOT `Entity#setInvulnerable(true)` (tried first, reverted) -- that skips
-  vanilla's damage pipeline entirely, and since knockback is applied as part of the same hurt
-  call, it also silently ate all knockback, making the bot useless for practice (no hit
-  reactions, wind burst did nothing). Uses `MobEffectInstance(MobEffects.RESISTANCE,
-  Integer.MAX_VALUE, 255, ...)` + `MobEffectInstance(MobEffects.REGENERATION,
-  Integer.MAX_VALUE, 1, ...)` instead -- the classic "effectively unkillable" combo (amplifier
-  255 is the well-known "resistance to everything" value from `/effect give`) that still runs
-  through the real hurt/knockback pipeline, so hits, knockback, and wind burst all behave
-  normally; the bot just never actually dies. `Integer.MAX_VALUE` duration rather than a
-  tick-based top-up loop, since ticks-until-expiry at that value is on the order of centuries.
+- **"Unkillable" -- third and correct attempt**. Vanilla rejects any hit while
+  `invulnerableTime > 0` (the normal post-hit i-frame window), and both `invulnerableTime`
+  and `hurtTime` are decremented in `Entity#tick`/`LivingEntity#tick` -- which for a
+  FakePlayer is a no-op. So the first hit set `invulnerableTime = 20` and *nothing ever
+  brought it down*, leaving the bot permanently unhittable. `PracticeBotAi#keepHittable`
+  now ticks both counters down by hand (they're public fields), and crucially runs
+  **before the IDLE early-return**, since mode-gating it is what left the plain
+  `/practicebot` dummy unhittable. Survivability is now "let real damage land, then heal"
+  (top back to full below 40%) rather than damage immunity. Note `FakePlayer.get()` returns
+  a **cached** instance per (level, profile), so `performSummon` explicitly calls
+  `removeEffect(RESISTANCE)` and `setInvulnerable(false)` -- otherwise a bot summoned by an
+  older build keeps the old immunity and survives the fix.
+- **Why not Resistance / setInvulnerable** (both tried, both reverted):
+  `setInvulnerable(true)` skips vanilla's damage pipeline entirely, and since knockback is
+  applied as part of the same hurt call, it silently ate all knockback too. Resistance at
+  amplifier 255 looked like the fix but is barely different in practice: it reduces incoming
+  damage to a flat 0, so hits register no damage *and* no knockback -- the same dead feeling,
+  just arrived at differently. Only Regeneration II is kept now, purely for the healing
+  particles; actual survivability is the health top-up described above.
 - **Shield mode**: each server tick, if not already `isUsingItem()`, calls
   `startUsingItem(InteractionHand.OFF_HAND)` — shield-blocking is a generic `LivingEntity`
   mechanic in vanilla, not player-specific, so this works on a non-player-controlled entity the

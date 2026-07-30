@@ -96,6 +96,11 @@ public final class PracticeBotAi {
     }
 
     public static void tick(FakePlayer bot, Mode mode, ServerLevel level) {
+        // MUST run before the IDLE early-return, and every tick regardless of mode --
+        // see keepHittable()'s javadoc. This being mode-gated is exactly why the plain
+        // `/practicebot` dummy became unhittable after a single hit.
+        keepHittable(bot);
+
         if (mode == Mode.IDLE) return;
         if (attackCooldown > 0) attackCooldown--;
         if (crystalCooldown > 0) crystalCooldown--;
@@ -121,6 +126,35 @@ public final class PracticeBotAi {
             case CRYSTAL -> crystal(bot, target, level);
             default -> {
             }
+        }
+    }
+
+    /**
+     * THE fix for "I can't hit him". Vanilla's damage entry point
+     * (`LivingEntity#hurt`) rejects any hit while `invulnerableTime > 0` --
+     * that's the normal ~0.5s i-frame window after every hit. Those counters
+     * are decremented in `Entity#tick`/`LivingEntity#tick`... which for a
+     * FakePlayer is a literal no-op. So the very first hit set
+     * `invulnerableTime = 20` and nothing ever brought it back down, leaving
+     * the bot permanently unhittable from then on. Both fields are public, so
+     * we just tick them down ourselves.
+     *
+     * Also keeps the bot alive by topping health back up when it gets low,
+     * rather than making it damage-immune. The previous approach (Resistance
+     * amplifier 255) reduced incoming damage to a flat 0, which meant hits
+     * registered no damage AND no knockback -- indistinguishable from the
+     * setInvulnerable(true) it was meant to replace. Letting damage land for
+     * real and healing afterwards keeps it genuinely unkillable while hits,
+     * knockback and hit animations all behave normally, and you can still see
+     * the health bar move so you know you're connecting.
+     */
+    private static void keepHittable(FakePlayer bot) {
+        if (bot.invulnerableTime > 0) bot.invulnerableTime--;
+        if (bot.hurtTime > 0) bot.hurtTime--;
+
+        float max = bot.getMaxHealth();
+        if (bot.getHealth() < max * 0.4f) {
+            bot.setHealth(max);
         }
     }
 
