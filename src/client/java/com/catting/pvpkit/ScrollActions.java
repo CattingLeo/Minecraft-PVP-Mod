@@ -36,7 +36,13 @@ public final class ScrollActions {
                 c.showCps = v;
                 c.showPing = v;
             });
-            case MODULE_HUD -> toggle(c -> c.moduleHud = !c.moduleHud);
+            case MODULE_HUD -> {
+                if (mc.gui.screen() instanceof ModuleListScreen) {
+                    mc.gui.setScreen(null);
+                } else {
+                    mc.gui.setScreen(new ModuleListScreen());
+                }
+            }
             case AUTO_TOTEM -> toggle(c -> c.autoTotem = !c.autoTotem);
             case AUTO_EAT -> toggle(c -> c.autoEat = !c.autoEat);
             case CRITICALS -> toggle(c -> c.criticals = !c.criticals);

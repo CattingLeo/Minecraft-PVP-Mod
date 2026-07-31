@@ -5,8 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import com.catting.nocooldown.NoCooldownConfig;
-
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -80,7 +78,6 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean AUTO_EAT = false;
     public static int AUTO_EAT_HUNGER_THRESHOLD = 14;
     public static boolean CRITICALS = false;
-    public static boolean MODULE_HUD = true;
 
     // ---- Xray (see XrayBlocks / README Fair use) ----
     public static boolean XRAY_ENABLED = false;
@@ -115,7 +112,7 @@ public class PvpKitClient implements ClientModInitializer {
         SHOW_HIT_MARKER = c.showHitMarker;
         HOTBAR_SWAP_FLASH = c.hotbarSwapFlash; DISABLE_SCROLL_HOTBAR = c.disableScrollHotbar;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
-        CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
+        CRITICALS = c.criticals;
         XRAY_ENABLED = c.xrayEnabled;
         XRAY_COAL = c.xrayCoal; XRAY_IRON = c.xrayIron; XRAY_COPPER = c.xrayCopper; XRAY_GOLD = c.xrayGold;
         XRAY_REDSTONE = c.xrayRedstone; XRAY_LAPIS = c.xrayLapis; XRAY_EMERALD = c.xrayEmerald;
@@ -490,44 +487,6 @@ public class PvpKitClient implements ClientModInitializer {
         }
 
         if (TOTEM_POP) renderTotemPop(graphics, w, h);
-        if (MODULE_HUD) renderModuleHud(graphics, mc, w);
-    }
-
-    /**
-     * A Meteor Client-style "module list" -- a vertical, right-aligned list
-     * naming whichever toggles from this mod are currently ON, top-right
-     * corner. Purely a status readout of this mod's OWN existing settings
-     * (nothing here does anything by itself); toggle with Right Shift
-     * (Options -> Controls -> Key Binds -> PvP Kit -> "Toggle Module HUD").
-     */
-    private void renderModuleHud(GuiGraphicsExtractor g, Minecraft mc, int screenW) {
-        NoCooldownConfig nc = NoCooldownConfig.get();
-        java.util.List<String> active = new java.util.ArrayList<>();
-        if (FULLBRIGHT) active.add("Fullbright");
-        if (LOCATOR_ENABLED) active.add("Locator");
-        if (COOLDOWN_FLASH) active.add("Cooldown Flash");
-        if (AUTO_TOTEM) active.add("Auto Totem");
-        if (AUTO_EAT) active.add("Auto Eat");
-        if (CRITICALS) active.add("Criticals");
-        if (XRAY_ENABLED) active.add("Xray");
-        if (FreecamManager.isActive()) active.add("Freecam");
-        if (nc.mode != NoCooldownConfig.Mode.DISABLED) active.add(nc.mode.label);
-        if (nc.unlimitedDurability) active.add("Unlimited Durability");
-        if (nc.instantUse) active.add("Instant Use");
-        if (nc.noDamage) active.add("No Damage");
-        if (nc.flightEnabled) active.add("Flight");
-        if (nc.infiniteHunger) active.add("Infinite Hunger");
-        if (nc.killAura) active.add("Kill Aura");
-        if (active.isEmpty()) return;
-
-        int y = 4;
-        for (String name : active) {
-            int tw = mc.font.width(name);
-            int x = screenW - tw - 6;
-            g.fill(x - 3, y - 1, screenW - 2, y + 9, 0x60000000);
-            g.text(mc.font, name, x, y, 0xFFE8B84B, true);
-            y += 11;
-        }
     }
 
     /** Reads the tab-list latency for the local player. Long-standing, stable vanilla API. */

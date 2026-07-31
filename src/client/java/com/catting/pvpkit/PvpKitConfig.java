@@ -102,7 +102,6 @@ public class PvpKitConfig {
     public boolean autoEat = false;
     public int autoEatHungerThreshold = 14;
     public boolean criticals = false;
-    public boolean moduleHud = true;
 
     // --- Xray (see PvpKitClient javadoc / README Fair use) ---
     public boolean xrayEnabled = false;

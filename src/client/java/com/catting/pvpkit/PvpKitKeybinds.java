@@ -141,7 +141,7 @@ public final class PvpKitKeybinds {
         while (TOGGLE_CRITICALS.consumeClick()) toggle(c -> c.criticals = !c.criticals);
         while (TOGGLE_FREECAM.consumeClick()) FreecamManager.toggle();
         while (TOGGLE_XRAY.consumeClick()) toggle(c -> c.xrayEnabled = !c.xrayEnabled);
-        while (TOGGLE_MODULE_HUD.consumeClick()) toggle(c -> c.moduleHud = !c.moduleHud);
+        while (TOGGLE_MODULE_HUD.consumeClick()) toggleModuleScreen(mc);
 
         if (recording) {
             long now = System.currentTimeMillis();
@@ -149,6 +149,15 @@ public final class PvpKitKeybinds {
                 lastFrameMs = now;
                 saveFrame(mc, recordingDir, String.format("frame_%06d", frameIndex++));
             }
+        }
+    }
+
+    /** Right Shift: open the clickable module list, or close it if it's already open. */
+    private static void toggleModuleScreen(Minecraft mc) {
+        if (mc.gui.screen() instanceof ModuleListScreen) {
+            mc.gui.setScreen(null);
+        } else {
+            mc.gui.setScreen(new ModuleListScreen());
         }
     }
 

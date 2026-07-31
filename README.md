@@ -100,7 +100,7 @@ default. See [Fair use](#fair-use).
 | **Auto Totem** | Keeps a totem in your offhand any time one exists elsewhere in your inventory |
 | **Auto Eat** | Switches to hotbar food and eats once hunger drops below a configurable threshold |
 | **Criticals** | Keeps you hopping while on the ground so every hit lands while airborne — automates the same legal bunny-hop timing good PvP players already use manually, doesn't fake anything server-side |
-| **Module HUD** | Top-right list naming whichever of this mod's toggles are currently on. Bound to **Right Shift** by default (every other keybind in this mod starts unbound — this one's the deliberate exception) |
+| **Module HUD** | Opens a clickable list of every module in the mod, top-right corner — click one to toggle it on/off right there, no need to dig into Mod Menu. Doesn't pause the game. Bound to **Right Shift** by default (every other keybind in this mod starts unbound — this one's the deliberate exception) |
 
 ### Xray
 Makes ordinary terrain (stone, dirt, deepslate, netherrack, and so on) fully invisible
@@ -197,7 +197,8 @@ need for this mod to duplicate it.
 
 **PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
 Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,
-Module HUD (Right Shift), Xray; plus **Screenshot** and **Start/Stop Recording** (captures to
+Xray, and **Module HUD** (Right Shift — opens the clickable module list rather than a
+plain toggle); plus **Screenshot** and **Start/Stop Recording** (captures to
 `files/screenshots/` and `files/screen recording/<timestamp>/` as a PNG sequence — turn
 it into a video with `ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt
 yuv420p out.mp4`, or use OBS Studio for real-time recording).
