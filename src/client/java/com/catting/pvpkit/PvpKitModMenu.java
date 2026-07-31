@@ -135,10 +135,6 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(false)
                     .setTooltip(Component.literal("Keeps you hopping while on the ground so every hit lands while airborne -- the same legal timing good PvP players already use, just automated."))
                     .setSaveConsumer(v -> c.criticals = v).build());
-            utility.addEntry(e.startBooleanToggle(Component.literal("Module HUD (Right Shift)"), c.moduleHud)
-                    .setDefaultValue(true)
-                    .setTooltip(Component.literal("Top-right list naming whichever toggles from this mod are currently on."))
-                    .setSaveConsumer(v -> c.moduleHud = v).build());
 
             // ---------------- Xray ----------------
             // Full block transparency: non-whitelisted solid terrain becomes invisible
@@ -178,35 +174,39 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(false).setSaveConsumer(v -> c.xrayContainers = v).build());
 
             // ---------------- Multi Bind ----------------
-            // Ordered: slot 1 resolves before slot 2, etc. Numbered rows rather than an
-            // add/remove list specifically so the firing order is visible and stable.
+            // One row per possible action (every MultiAction), listing every key
+            // currently bound to it plus one always-present empty field for adding
+            // another -- set that one to a real key and it becomes a real binding.
+            // Bindings fire in the order they were bound (MultiBindConfig#addedSeq),
+            // not row order, so several actions can share one key predictably.
             ConfigCategory multi = b.getOrCreateCategory(Component.literal("Multi Bind"));
-            MultiBindConfig mb = MultiBindConfig.get();
-            for (int i = 0; i < MultiBindConfig.SLOT_COUNT; i++) {
-                MultiBindConfig.Slot slot = mb.slots.get(i);
-                int n = i + 1;
-                multi.addEntry(e.startEnumSelector(Component.literal("Binding " + n + " - Action"),
-                                MultiBindConfig.MultiAction.class, slot.action)
-                        .setDefaultValue(MultiBindConfig.MultiAction.NONE)
-                        .setTooltip(Component.literal(
-                                "Actions fire in the order you ADD them, not by row number. Setting a row "
-                                + "back to None and re-using it later puts it at the end of the order."))
-                        .setSaveConsumer(v -> {
-                            // Stamp the insertion number only on the None -> action transition,
-                            // so editing an existing binding's action keeps its place in the order.
-                            if (slot.action == MultiBindConfig.MultiAction.NONE
-                                    && v != MultiBindConfig.MultiAction.NONE) {
-                                slot.addedSeq = MultiBindConfig.nextSeq();
-                            } else if (v == MultiBindConfig.MultiAction.NONE) {
-                                slot.addedSeq = -1;
-                            }
-                            slot.action = v;
-                        }).build());
-                InputConstants.Key current = InputConstants.getKey(slot.key);
-                multi.addEntry(e.startKeyCodeField(Component.literal(n + ". Key"),
-                                current == null ? InputConstants.UNKNOWN : current)
+            for (MultiBindConfig.MultiAction action : MultiBindConfig.MultiAction.values()) {
+                if (action == MultiBindConfig.MultiAction.NONE) continue;
+                java.util.List<MultiBindConfig.Slot> existing = MultiBindConfig.slotsFor(action);
+                int n = 0;
+                for (MultiBindConfig.Slot slot : existing) {
+                    n++;
+                    InputConstants.Key current = InputConstants.getKey(slot.key);
+                    multi.addEntry(e.startKeyCodeField(
+                                    Component.literal(action.label + " -- key " + n),
+                                    current == null ? InputConstants.UNKNOWN : current)
+                            .setDefaultValue(InputConstants.UNKNOWN)
+                            .setKeySaveConsumer(k -> slot.key = k.getName())
+                            .build());
+                }
+                // Not backed by a real Slot until it's actually set to a key, so an
+                // untouched field leaves no trace in the config.
+                multi.addEntry(e.startKeyCodeField(
+                                Component.literal(action.label + " -- add key"), InputConstants.UNKNOWN)
                         .setDefaultValue(InputConstants.UNKNOWN)
-                        .setKeySaveConsumer(k -> slot.key = k.getName())
+                        .setTooltip(Component.literal(
+                                "Bindings fire in the order you add them across ALL actions, not by row."))
+                        .setKeySaveConsumer(k -> {
+                            if (k == null || k == InputConstants.UNKNOWN) return;
+                            MultiBindConfig.Slot fresh = MultiBindConfig.addSlot(action);
+                            fresh.key = k.getName();
+                            fresh.addedSeq = MultiBindConfig.nextSeq();
+                        })
                         .build());
             }
 

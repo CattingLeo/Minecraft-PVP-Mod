@@ -14,14 +14,15 @@ import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
- * Fires multi-bind slots in list order, so several actions can share one key
- * and run top-to-bottom predictably.
+ * Fires multi-bind slots in the order each one's key was bound (Slot#addedSeq),
+ * so several actions can share one key and run predictably regardless of which
+ * order they happen to sit in config/multibind.json.
  *
  * Two details that matter:
  *
- * 1. Slots are evaluated in index order every tick, so slot 1 always resolves
- *    before slot 2. That's the whole point -- vanilla fires every KeyMapping
- *    sharing a key, but in registration order, which no one controls.
+ * 1. Bindings are sorted by addedSeq every tick, not by list position -- that's
+ *    the whole point -- vanilla fires every KeyMapping sharing a key, but in
+ *    registration order, which no one controls.
  *
  * 2. Vanilla actions are driven by holding the REAL KeyMapping down via the
  *    public `setDown(true)`, not by faking clicks. Going through the actual
@@ -39,9 +40,12 @@ import net.minecraft.world.entity.player.Inventory;
  */
 public final class MultiBindManager {
 
-    private static final boolean[] wasDown = new boolean[MultiBindConfig.SLOT_COUNT];
-    private static final int[] releaseCountdown = new int[MultiBindConfig.SLOT_COUNT];
-    private static final KeyMapping[] held = new KeyMapping[MultiBindConfig.SLOT_COUNT];
+    // Keyed by the Slot object's identity (Gson-loaded objects are stable in memory for
+    // the process lifetime), since the binding list is no longer a fixed-size, fixed-index
+    // array of rows -- any action can have any number of bound keys.
+    private static final java.util.Map<Slot, Boolean> wasDown = new java.util.IdentityHashMap<>();
+    private static final java.util.Map<Slot, Integer> releaseCountdown = new java.util.IdentityHashMap<>();
+    private static final java.util.Map<Slot, KeyMapping> held = new java.util.IdentityHashMap<>();
 
     private MultiBindManager() {
     }
@@ -53,39 +57,40 @@ public final class MultiBindManager {
     private static void onTick(Minecraft mc) {
         // Release anything held from a previous tick first, so a held vanilla key
         // never sticks on if the slot is reconfigured mid-hold.
-        for (int i = 0; i < MultiBindConfig.SLOT_COUNT; i++) {
-            if (releaseCountdown[i] > 0 && --releaseCountdown[i] == 0 && held[i] != null) {
-                held[i].setDown(false);
-                held[i] = null;
+        for (var it = releaseCountdown.entrySet().iterator(); it.hasNext(); ) {
+            var entry = it.next();
+            int left = entry.getValue() - 1;
+            if (left <= 0) {
+                KeyMapping mapping = held.remove(entry.getKey());
+                if (mapping != null) mapping.setDown(false);
+                it.remove();
+            } else {
+                entry.setValue(left);
             }
         }
 
         if (mc.player == null || !mc.mouseHandler.isMouseGrabbed()) return;
 
-        // Fire in the order the bindings were ADDED, not row order -- a binding added
-        // later always runs after one added earlier, even if it sits in an earlier row.
-        // Row index is still used for the per-slot press/hold bookkeeping arrays.
+        // Fire in the order the bindings were ADDED, not list order -- a binding added
+        // later always runs after one added earlier, even if it appears above it.
         var raw = MultiBindConfig.get().slots;
-        var order = new java.util.ArrayList<Integer>();
-        for (int i = 0; i < raw.size() && i < MultiBindConfig.SLOT_COUNT; i++) {
-            if (raw.get(i).action != MultiAction.NONE) order.add(i);
-        }
-        order.sort(java.util.Comparator.comparingInt(i -> raw.get(i).addedSeq));
+        var order = new java.util.ArrayList<>(raw);
+        order.removeIf(s -> s.action == MultiAction.NONE);
+        order.sort(java.util.Comparator.comparingInt(s -> s.addedSeq));
 
-        for (int i : order) {
-            Slot slot = raw.get(i);
+        for (Slot slot : order) {
             InputConstants.Key key = InputConstants.getKey(slot.key);
             if (key == null || key == InputConstants.UNKNOWN) continue;
 
             boolean down = isPhysicallyDown(mc, key);
-            if (down && !wasDown[i]) {
-                run(mc, slot.action, i);
+            if (down && !wasDown.getOrDefault(slot, false)) {
+                run(mc, slot.action, slot);
             }
-            wasDown[i] = down;
+            wasDown.put(slot, down);
         }
     }
 
-    private static void run(Minecraft mc, MultiAction action, int index) {
+    private static void run(Minecraft mc, MultiAction action, Slot slot) {
         switch (action) {
             case HOTBAR_1 -> hotbar(mc, 0);
             case HOTBAR_2 -> hotbar(mc, 1);
@@ -96,13 +101,13 @@ public final class MultiBindManager {
             case HOTBAR_7 -> hotbar(mc, 6);
             case HOTBAR_8 -> hotbar(mc, 7);
             case HOTBAR_9 -> hotbar(mc, 8);
-            case ATTACK -> hold(mc.options.keyAttack, index);
-            case USE -> hold(mc.options.keyUse, index);
-            case SWAP_OFFHAND -> hold(mc.options.keySwapOffhand, index);
-            case DROP -> hold(mc.options.keyDrop, index);
-            case JUMP -> hold(mc.options.keyJump, index);
-            case SNEAK -> hold(mc.options.keyShift, index);
-            case SPRINT -> hold(mc.options.keySprint, index);
+            case ATTACK -> hold(mc.options.keyAttack, slot);
+            case USE -> hold(mc.options.keyUse, slot);
+            case SWAP_OFFHAND -> hold(mc.options.keySwapOffhand, slot);
+            case DROP -> hold(mc.options.keyDrop, slot);
+            case JUMP -> hold(mc.options.keyJump, slot);
+            case SNEAK -> hold(mc.options.keyShift, slot);
+            case SPRINT -> hold(mc.options.keySprint, slot);
             case TOGGLE_FULLBRIGHT -> ScrollActions.run(PvpKitConfig.ScrollAction.FULLBRIGHT);
             case TOGGLE_FREECAM -> FreecamManager.toggle();
             case TOGGLE_KILL_AURA -> {
@@ -121,11 +126,11 @@ public final class MultiBindManager {
     }
 
     /** Holds a real vanilla KeyMapping down briefly, letting the game's own input handling drive the action. */
-    private static void hold(KeyMapping mapping, int index) {
+    private static void hold(KeyMapping mapping, Slot slot) {
         if (mapping == null) return;
         mapping.setDown(true);
-        held[index] = mapping;
-        releaseCountdown[index] = 3;
+        held.put(slot, mapping);
+        releaseCountdown.put(slot, 3);
     }
 
     private static void hotbar(Minecraft mc, int slot) {

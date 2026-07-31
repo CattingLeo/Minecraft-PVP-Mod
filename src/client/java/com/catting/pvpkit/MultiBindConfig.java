@@ -11,14 +11,22 @@ import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 
 /**
- * Ordered multi-binding: several actions on one key, fired top-to-bottom in
- * the order they're listed.
+ * Ordered multi-binding: several actions can share one key, and several keys
+ * can drive one action, fired in the order each binding was ADDED (see
+ * addedSeq) rather than list/row order.
  *
  * Exists because the separate Multi Key Bindings mod stores its bindings in
- * its own config and fires them in no guaranteed order, and being a third-party
- * mod there's no way for this one to impose an order on it. Slots here are a
- * fixed, numbered list precisely so "the order you added them" is explicit and
- * visible rather than implied by a hash map's iteration order.
+ * its own config and fires them in no guaranteed order, and being a
+ * third-party mod there's no way for this one to impose an order on it.
+ *
+ * The Mod Menu screen shows one row per action (every possible MultiAction),
+ * one keycode field per key currently bound to it, plus one always-present
+ * empty field at the end for adding another. Setting that empty field to a
+ * real key appends a brand-new Slot for that action -- see PvpKitModMenu.
+ * A fresh "add another" row for that same action only appears the next time
+ * the screen is opened (Cloth Config builds its entry list once, from
+ * whatever's in `slots` at screen-open time), which is an accepted trade-off
+ * for not needing a fully custom dynamic-list Screen.
  *
  * config/multibind.json
  */
@@ -60,15 +68,15 @@ public class MultiBindConfig {
         }
     }
 
-    /** One row: an action plus the key that triggers it. Key is stored as InputConstants' own name ("key.keyboard.left.alt"). */
+    /** One binding: an action plus the key that triggers it. Key is stored as InputConstants' own name ("key.keyboard.left.alt"). */
     public static class Slot {
         public MultiAction action = MultiAction.NONE;
         public String key = "key.keyboard.unknown";
         /**
-         * When this binding was added, which is what firing order follows -- NOT the
-         * row number. Set once when the row goes from None to a real action, and
-         * cleared back to -1 when it's set back to None, so re-using an old row puts
-         * it at the END of the order rather than back where it used to be.
+         * When this binding's key was set, which is what firing order follows -- NOT
+         * list position. Stamped once when the key goes from unset to a real key, and
+         * cleared back to -1 if it's cleared back to unset, so re-binding it later
+         * puts it at the END of the order rather than back where it used to be.
          */
         public int addedSeq = -1;
     }
@@ -80,7 +88,22 @@ public class MultiBindConfig {
         return max + 1;
     }
 
-    public static final int SLOT_COUNT = 10;
+    /** Existing bindings for one action, in list order (display order for the "Binding N" rows). */
+    public static List<Slot> slotsFor(MultiAction action) {
+        List<Slot> out = new ArrayList<>();
+        for (Slot s : get().slots) {
+            if (s.action == action) out.add(s);
+        }
+        return out;
+    }
+
+    /** Appends a brand-new, still-unbound slot for the given action -- the backing object for an "add another" row. */
+    public static Slot addSlot(MultiAction action) {
+        Slot s = new Slot();
+        s.action = action;
+        get().slots.add(s);
+        return s;
+    }
 
     public List<Slot> slots = new ArrayList<>();
 
@@ -104,11 +127,8 @@ public class MultiBindConfig {
         }
         if (instance == null) instance = new MultiBindConfig();
         if (instance.slots == null) instance.slots = new ArrayList<>();
-        // Pad to a stable length so slot N is always the same row in the UI and
-        // the firing order can't shift just because an earlier slot was cleared.
-        while (instance.slots.size() < SLOT_COUNT) instance.slots.add(new Slot());
+        instance.slots.removeIf(s -> s.action == null || s.action == MultiAction.NONE);
         for (Slot s : instance.slots) {
-            if (s.action == null) s.action = MultiAction.NONE;
             if (s.key == null) s.key = "key.keyboard.unknown";
         }
     }
