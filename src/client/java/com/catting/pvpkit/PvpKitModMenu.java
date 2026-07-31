@@ -140,6 +140,43 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setTooltip(Component.literal("Top-right list naming whichever toggles from this mod are currently on."))
                     .setSaveConsumer(v -> c.moduleHud = v).build());
 
+            // ---------------- Xray ----------------
+            // Full block transparency: non-whitelisted solid terrain becomes invisible
+            // so ore/valuable blocks show through it. Works on any server (the client
+            // already has the block data), so treat it like Kill Aura -- fine in your
+            // own world, a bannable exploit on servers that don't allow it. See
+            // README's Fair use section.
+            ConfigCategory xray = b.getOrCreateCategory(Component.literal("Xray"));
+            xray.addEntry(e.startBooleanToggle(Component.literal("Enable Xray"), c.xrayEnabled)
+                    .setDefaultValue(false)
+                    .setTooltip(Component.literal(
+                            "Makes ordinary terrain invisible so the ore types below show through it. "
+                            + "Works on any server since the block data is already sent to your client -- "
+                            + "most servers ban this, see the README's Fair use section."))
+                    .setSaveConsumer(v -> c.xrayEnabled = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Coal"), c.xrayCoal)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayCoal = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Iron"), c.xrayIron)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayIron = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Copper"), c.xrayCopper)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayCopper = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Gold (incl. Nether Gold Ore)"), c.xrayGold)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayGold = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Redstone"), c.xrayRedstone)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayRedstone = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Lapis"), c.xrayLapis)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayLapis = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Emerald"), c.xrayEmerald)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayEmerald = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Diamond"), c.xrayDiamond)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayDiamond = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Ancient Debris"), c.xrayAncientDebris)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayAncientDebris = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Nether Quartz"), c.xrayNetherQuartz)
+                    .setDefaultValue(true).setSaveConsumer(v -> c.xrayNetherQuartz = v).build());
+            xray.addEntry(e.startBooleanToggle(Component.literal("Chests / Barrels / Shulker Boxes / Spawners"), c.xrayContainers)
+                    .setDefaultValue(false).setSaveConsumer(v -> c.xrayContainers = v).build());
+
             // ---------------- Multi Bind ----------------
             // Ordered: slot 1 resolves before slot 2, etc. Numbered rows rather than an
             // add/remove list specifically so the firing order is visible and stable.

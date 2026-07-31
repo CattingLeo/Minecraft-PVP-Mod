@@ -38,7 +38,7 @@ The finished jar lands in `build/libs/` — take the one **without** the `-sourc
 
 ## Features
 
-Configured entirely from **Mod Menu → .PVP KIT**, across seven pages:
+Configured entirely from **Mod Menu → .PVP KIT**, across eight pages:
 
 ### HUD
 FPS, CPS, and Ping — all rainbow-cycling text, positioned bottom-left to stay clear of
@@ -75,8 +75,8 @@ toggle, on by default).
   freeing it for something else. GUI/inventory/chat scrolling is unaffected.
 - **Scroll UP / DOWN action** — pick what each wheel direction does, so the wheel works
   like a keybind: hotbar next/previous, or toggle Fullbright, Freecam, Locator, HUD,
-  Module HUD, Auto Totem, Auto Eat, Criticals, Kill Aura, Flight, or No Damage. Only
-  fires while you're actually playing, not in menus or chat.
+  Module HUD, Auto Totem, Auto Eat, Criticals, Kill Aura, Flight, No Damage, or Xray.
+  Only fires while you're actually playing, not in menus or chat.
 
   These are config dropdowns rather than real bindable keys because Minecraft's Key Binds
   screen can't capture a scroll event at all — see [DEVELOPMENT.md](DEVELOPMENT.md).
@@ -101,6 +101,18 @@ default. See [Fair use](#fair-use).
 | **Auto Eat** | Switches to hotbar food and eats once hunger drops below a configurable threshold |
 | **Criticals** | Keeps you hopping while on the ground so every hit lands while airborne — automates the same legal bunny-hop timing good PvP players already use manually, doesn't fake anything server-side |
 | **Module HUD** | Top-right list naming whichever of this mod's toggles are currently on. Bound to **Right Shift** by default (every other keybind in this mod starts unbound — this one's the deliberate exception) |
+
+### Xray
+Makes ordinary terrain (stone, dirt, deepslate, netherrack, and so on) fully invisible
+client-side, so ore blocks show right through it from anywhere — the classic full-block
+Xray effect, not just a glow/outline. Per-ore toggles for Coal, Iron, Copper, Gold
+(including Nether Gold Ore), Redstone, Lapis, Emerald, Diamond, Ancient Debris, and
+Nether Quartz, plus an optional toggle for chests/barrels/shulker boxes/spawners. Off by
+default; toggling it (keybind, scroll action, or the Mod Menu switch) takes effect
+immediately, no world reload needed. Works correctly alongside Sodium — it hooks
+BlockState-level render/occlusion methods that Sodium's mesh builder consults the same
+way vanilla does, not the vanilla chunk-renderer classes Sodium replaces. **Read
+[Fair use](#fair-use) before using this anywhere but your own world.**
 
 ### No Cooldown page
 Independent sandbox toggles, plus the original three-way cooldown-removal mode:
@@ -166,6 +178,11 @@ This mod's design draws a hard line between two categories:
   against people who haven't agreed to it is plain cheating and a fast ban on any
   moderated server. It exists here for the same reason the rest of the sandbox page
   does — private worlds and LAN games where everyone's in on it.
+- **Xray gets the same warning, for a different reason**: it's not combat-related, but
+  the server always sends your client the full block data for loaded chunks regardless
+  of what you can see, so Xray works on literally any server, not just ones you host.
+  Most servers explicitly ban it and many run anti-Xray detection — treat it the same as
+  Kill Aura: your own worlds, or servers that have explicitly said it's allowed.
 
 ## Keybinds
 
@@ -180,7 +197,7 @@ need for this mod to duplicate it.
 
 **PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
 Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,
-Module HUD (Right Shift); plus **Screenshot** and **Start/Stop Recording** (captures to
+Module HUD (Right Shift), Xray; plus **Screenshot** and **Start/Stop Recording** (captures to
 `files/screenshots/` and `files/screen recording/<timestamp>/` as a PNG sequence — turn
 it into a video with `ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt
 yuv420p out.mp4`, or use OBS Studio for real-time recording).

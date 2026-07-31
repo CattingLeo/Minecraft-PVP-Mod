@@ -3,12 +3,14 @@
 	"package": "com.catting.pvpkit.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"CameraMixin",
 		"FogMixin",
 		"FovMixin",
 		"ExplosionParticleMixin",
 		"GuiMixin",
 		"HitMarkerMixin",
-		"ScrollHotbarMixin"
+		"ScrollHotbarMixin",
+		"XrayMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

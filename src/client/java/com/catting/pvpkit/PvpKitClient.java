@@ -82,6 +82,21 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean CRITICALS = false;
     public static boolean MODULE_HUD = true;
 
+    // ---- Xray (see XrayBlocks / README Fair use) ----
+    public static boolean XRAY_ENABLED = false;
+    public static boolean XRAY_COAL = true;
+    public static boolean XRAY_IRON = true;
+    public static boolean XRAY_COPPER = true;
+    public static boolean XRAY_GOLD = true;
+    public static boolean XRAY_REDSTONE = true;
+    public static boolean XRAY_LAPIS = true;
+    public static boolean XRAY_EMERALD = true;
+    public static boolean XRAY_DIAMOND = true;
+    public static boolean XRAY_ANCIENT_DEBRIS = true;
+    public static boolean XRAY_NETHER_QUARTZ = true;
+    public static boolean XRAY_CONTAINERS = false;
+    private static int lastXraySignature = 0;
+
     /** Copy persisted config -> live flags. Called on load and on config save. */
     public static void applyConfig() {
         PvpKitConfig c = PvpKitConfig.get();
@@ -101,6 +116,53 @@ public class PvpKitClient implements ClientModInitializer {
         HOTBAR_SWAP_FLASH = c.hotbarSwapFlash; DISABLE_SCROLL_HOTBAR = c.disableScrollHotbar;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
         CRITICALS = c.criticals; MODULE_HUD = c.moduleHud;
+        XRAY_ENABLED = c.xrayEnabled;
+        XRAY_COAL = c.xrayCoal; XRAY_IRON = c.xrayIron; XRAY_COPPER = c.xrayCopper; XRAY_GOLD = c.xrayGold;
+        XRAY_REDSTONE = c.xrayRedstone; XRAY_LAPIS = c.xrayLapis; XRAY_EMERALD = c.xrayEmerald;
+        XRAY_DIAMOND = c.xrayDiamond; XRAY_ANCIENT_DEBRIS = c.xrayAncientDebris;
+        XRAY_NETHER_QUARTZ = c.xrayNetherQuartz; XRAY_CONTAINERS = c.xrayContainers;
+
+        int sig = xraySignature();
+        if (sig != lastXraySignature) {
+            lastXraySignature = sig;
+            refreshXrayChunks();
+        }
+    }
+
+    /**
+     * Packs every Xray-relevant flag into one int so applyConfig() can tell whether
+     * Xray actually changed (vs. some unrelated setting saving) and only force a
+     * chunk remesh -- not free, so worth skipping -- when it did.
+     */
+    private static int xraySignature() {
+        int sig = 0;
+        if (XRAY_ENABLED) sig |= 1;
+        if (XRAY_COAL) sig |= 1 << 1;
+        if (XRAY_IRON) sig |= 1 << 2;
+        if (XRAY_COPPER) sig |= 1 << 3;
+        if (XRAY_GOLD) sig |= 1 << 4;
+        if (XRAY_REDSTONE) sig |= 1 << 5;
+        if (XRAY_LAPIS) sig |= 1 << 6;
+        if (XRAY_EMERALD) sig |= 1 << 7;
+        if (XRAY_DIAMOND) sig |= 1 << 8;
+        if (XRAY_ANCIENT_DEBRIS) sig |= 1 << 9;
+        if (XRAY_NETHER_QUARTZ) sig |= 1 << 10;
+        if (XRAY_CONTAINERS) sig |= 1 << 11;
+        return sig;
+    }
+
+    /**
+     * getRenderShape()/canOcclude() are only consulted when a chunk section's mesh
+     * gets (re)built, so toggling Xray needs to force that -- otherwise you'd have
+     * to walk away and back, or reload the world, before it visually took effect.
+     * invalidateCompiledGeometry() is 26.2's renamed equivalent of the older
+     * "allChanged()" full re-render call (verified via javap -- LevelRenderer no
+     * longer has an allChanged method in this version).
+     */
+    private static void refreshXrayChunks() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        mc.levelRenderer.invalidateCompiledGeometry(mc.level, mc.options, mc.gameRenderer.mainCamera(), mc.getBlockColors());
     }
 
     // ---- Totem corner pop ----
@@ -447,6 +509,7 @@ public class PvpKitClient implements ClientModInitializer {
         if (AUTO_TOTEM) active.add("Auto Totem");
         if (AUTO_EAT) active.add("Auto Eat");
         if (CRITICALS) active.add("Criticals");
+        if (XRAY_ENABLED) active.add("Xray");
         if (FreecamManager.isActive()) active.add("Freecam");
         if (nc.mode != NoCooldownConfig.Mode.DISABLED) active.add(nc.mode.label);
         if (nc.unlimitedDurability) active.add("Unlimited Durability");

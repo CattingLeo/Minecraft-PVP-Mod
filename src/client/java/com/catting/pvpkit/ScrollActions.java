@@ -43,6 +43,7 @@ public final class ScrollActions {
             case KILL_AURA -> toggleNoCooldown(c -> c.killAura = !c.killAura);
             case FLIGHT -> toggleNoCooldown(c -> c.flightEnabled = !c.flightEnabled);
             case NO_DAMAGE -> toggleNoCooldown(c -> c.noDamage = !c.noDamage);
+            case XRAY -> toggle(c -> c.xrayEnabled = !c.xrayEnabled);
             default -> {
             }
         }

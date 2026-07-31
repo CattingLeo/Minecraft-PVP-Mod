@@ -33,7 +33,8 @@ public class PvpKitConfig {
         CRITICALS("Toggle Criticals"),
         KILL_AURA("Toggle Kill Aura"),
         FLIGHT("Toggle Flight"),
-        NO_DAMAGE("Toggle No Damage");
+        NO_DAMAGE("Toggle No Damage"),
+        XRAY("Toggle Xray");
 
         public final String label;
 
@@ -102,6 +103,20 @@ public class PvpKitConfig {
     public int autoEatHungerThreshold = 14;
     public boolean criticals = false;
     public boolean moduleHud = true;
+
+    // --- Xray (see PvpKitClient javadoc / README Fair use) ---
+    public boolean xrayEnabled = false;
+    public boolean xrayCoal = true;
+    public boolean xrayIron = true;
+    public boolean xrayCopper = true;
+    public boolean xrayGold = true;
+    public boolean xrayRedstone = true;
+    public boolean xrayLapis = true;
+    public boolean xrayEmerald = true;
+    public boolean xrayDiamond = true;
+    public boolean xrayAncientDebris = true;
+    public boolean xrayNetherQuartz = true;
+    public boolean xrayContainers = false;
 
     // ------------------------------------------------------------------
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
