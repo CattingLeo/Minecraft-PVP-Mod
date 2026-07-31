@@ -64,6 +64,20 @@ public class MultiBindConfig {
     public static class Slot {
         public MultiAction action = MultiAction.NONE;
         public String key = "key.keyboard.unknown";
+        /**
+         * When this binding was added, which is what firing order follows -- NOT the
+         * row number. Set once when the row goes from None to a real action, and
+         * cleared back to -1 when it's set back to None, so re-using an old row puts
+         * it at the END of the order rather than back where it used to be.
+         */
+        public int addedSeq = -1;
+    }
+
+    /** Next insertion number, i.e. one past the highest currently in use. */
+    public static int nextSeq() {
+        int max = -1;
+        for (Slot s : get().slots) max = Math.max(max, s.addedSeq);
+        return max + 1;
     }
 
     public static final int SLOT_COUNT = 10;

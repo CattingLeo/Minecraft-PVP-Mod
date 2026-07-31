@@ -62,10 +62,18 @@ public final class MultiBindManager {
 
         if (mc.player == null || !mc.mouseHandler.isMouseGrabbed()) return;
 
-        var slots = MultiBindConfig.get().slots;
-        for (int i = 0; i < slots.size() && i < MultiBindConfig.SLOT_COUNT; i++) {
-            Slot slot = slots.get(i);
-            if (slot.action == MultiAction.NONE) continue;
+        // Fire in the order the bindings were ADDED, not row order -- a binding added
+        // later always runs after one added earlier, even if it sits in an earlier row.
+        // Row index is still used for the per-slot press/hold bookkeeping arrays.
+        var raw = MultiBindConfig.get().slots;
+        var order = new java.util.ArrayList<Integer>();
+        for (int i = 0; i < raw.size() && i < MultiBindConfig.SLOT_COUNT; i++) {
+            if (raw.get(i).action != MultiAction.NONE) order.add(i);
+        }
+        order.sort(java.util.Comparator.comparingInt(i -> raw.get(i).addedSeq));
+
+        for (int i : order) {
+            Slot slot = raw.get(i);
             InputConstants.Key key = InputConstants.getKey(slot.key);
             if (key == null || key == InputConstants.UNKNOWN) continue;
 

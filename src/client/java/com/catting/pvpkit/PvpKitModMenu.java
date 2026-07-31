@@ -148,10 +148,23 @@ public class PvpKitModMenu implements ModMenuApi {
             for (int i = 0; i < MultiBindConfig.SLOT_COUNT; i++) {
                 MultiBindConfig.Slot slot = mb.slots.get(i);
                 int n = i + 1;
-                multi.addEntry(e.startEnumSelector(Component.literal(n + ". Action"),
+                multi.addEntry(e.startEnumSelector(Component.literal("Binding " + n + " - Action"),
                                 MultiBindConfig.MultiAction.class, slot.action)
                         .setDefaultValue(MultiBindConfig.MultiAction.NONE)
-                        .setSaveConsumer(v -> slot.action = v).build());
+                        .setTooltip(Component.literal(
+                                "Actions fire in the order you ADD them, not by row number. Setting a row "
+                                + "back to None and re-using it later puts it at the end of the order."))
+                        .setSaveConsumer(v -> {
+                            // Stamp the insertion number only on the None -> action transition,
+                            // so editing an existing binding's action keeps its place in the order.
+                            if (slot.action == MultiBindConfig.MultiAction.NONE
+                                    && v != MultiBindConfig.MultiAction.NONE) {
+                                slot.addedSeq = MultiBindConfig.nextSeq();
+                            } else if (v == MultiBindConfig.MultiAction.NONE) {
+                                slot.addedSeq = -1;
+                            }
+                            slot.action = v;
+                        }).build());
                 InputConstants.Key current = InputConstants.getKey(slot.key);
                 multi.addEntry(e.startKeyCodeField(Component.literal(n + ". Key"),
                                 current == null ? InputConstants.UNKNOWN : current)
