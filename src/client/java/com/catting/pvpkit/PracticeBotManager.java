@@ -121,6 +121,21 @@ public final class PracticeBotManager {
             if (bot == null || !bot.isAlive()) return;
             ServerLevel level = (ServerLevel) bot.level();
             PracticeBotAi.tick(bot, mode, level);
+
+            // Re-send the player-info the client needs to accept this entity, every few
+            // seconds for as long as the bot is alive -- see performSummon's javadoc for
+            // why it's needed at all. A single broadcast at summon time isn't enough:
+            // vanilla's per-player entity tracker (ChunkMap$TrackedEntity) drops and
+            // re-adds tracked entities as you move in and out of tracking range, sending
+            // a fresh "add entity" packet each time it re-adds -- and if the client has
+            // since forgotten this UUID's player-info (walk far enough away, come back
+            // later), that re-add gets silently rejected client-side ("Skipping Entity
+            // with id entity.minecraft.player"), and the bot just isn't there anymore.
+            // The one-shot broadcast in performSummon only covers the FIRST add.
+            if (level.getGameTime() % 100 == 0) {
+                server.getPlayerList().broadcastAll(
+                        ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(bot)));
+            }
         });
 
         ServerLifecycleEvents.SERVER_STARTED.register(PracticeBotManager::restoreOnServerStart);
