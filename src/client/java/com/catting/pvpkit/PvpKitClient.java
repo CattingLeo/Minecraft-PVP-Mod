@@ -206,6 +206,7 @@ public class PvpKitClient implements ClientModInitializer {
         PracticeBotManager.init();
         FreecamManager.init();
         ScrollKeybind.init();
+        MultiBindManager.init();
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientEntityEvents.ENTITY_LOAD.register((entity, world) -> {

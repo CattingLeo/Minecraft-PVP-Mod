@@ -1,6 +1,7 @@
 package com.catting.pvpkit;
 
 import com.catting.nocooldown.NoCooldownConfig;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.catting.pvpkit.PvpKitConfig.TotemCorner;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
@@ -25,6 +26,7 @@ public class PvpKitModMenu implements ModMenuApi {
                 PvpKitConfig.save();
                 PvpKitClient.applyConfig();
                 NoCooldownConfig.save();
+                MultiBindConfig.save();
             });
             ConfigEntryBuilder e = b.entryBuilder();
 
@@ -137,6 +139,26 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("Top-right list naming whichever toggles from this mod are currently on."))
                     .setSaveConsumer(v -> c.moduleHud = v).build());
+
+            // ---------------- Multi Bind ----------------
+            // Ordered: slot 1 resolves before slot 2, etc. Numbered rows rather than an
+            // add/remove list specifically so the firing order is visible and stable.
+            ConfigCategory multi = b.getOrCreateCategory(Component.literal("Multi Bind"));
+            MultiBindConfig mb = MultiBindConfig.get();
+            for (int i = 0; i < MultiBindConfig.SLOT_COUNT; i++) {
+                MultiBindConfig.Slot slot = mb.slots.get(i);
+                int n = i + 1;
+                multi.addEntry(e.startEnumSelector(Component.literal(n + ". Action"),
+                                MultiBindConfig.MultiAction.class, slot.action)
+                        .setDefaultValue(MultiBindConfig.MultiAction.NONE)
+                        .setSaveConsumer(v -> slot.action = v).build());
+                InputConstants.Key current = InputConstants.getKey(slot.key);
+                multi.addEntry(e.startKeyCodeField(Component.literal(n + ". Key"),
+                                current == null ? InputConstants.UNKNOWN : current)
+                        .setDefaultValue(InputConstants.UNKNOWN)
+                        .setKeySaveConsumer(k -> slot.key = k.getName())
+                        .build());
+            }
 
             // ---------------- No Cooldown ----------------
             // Private-world / LAN-with-friends sandbox toggles. Effective in worlds
