@@ -27,7 +27,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -111,19 +110,8 @@ public final class PracticeBotManager {
             var root = ClientCommands.literal("practicebot")
                     .executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.IDLE))
                     .then(ClientCommands.literal("remove").executes(PracticeBotManager::remove));
-            // One subcommand per mode, named from its label ("elytra mace" ->
-            // /practicebot elytra mace, i.e. nested literals).
             root = root.then(ClientCommands.literal("shield").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.SHIELD)));
-            root = root.then(ClientCommands.literal("sword").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.SWORD)));
-            root = root.then(ClientCommands.literal("axe").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.AXE)));
             root = root.then(ClientCommands.literal("defend").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.DEFEND)));
-            root = root.then(ClientCommands.literal("crystal").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.CRYSTAL)));
-            root = root.then(ClientCommands.literal("mace")
-                    .executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.MACE)));
-            root = root.then(ClientCommands.literal("elytra")
-                    .then(ClientCommands.literal("mace").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.ELYTRA_MACE))));
-            root = root.then(ClientCommands.literal("firework")
-                    .then(ClientCommands.literal("mace").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.FIREWORK_MACE))));
             dispatcher.register(root);
         });
 
@@ -215,21 +203,8 @@ public final class PracticeBotManager {
         newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));
         newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS));
         newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS));
-        // The flying mace modes wear an elytra instead of the chestplate, so it's
-        // visible on its back mid-dive (the glide animation itself won't play --
-        // that needs a non-public gliding flag; see DEVELOPMENT.md).
-        boolean flying = requested == PracticeBotAi.Mode.ELYTRA_MACE || requested == PracticeBotAi.Mode.FIREWORK_MACE;
-        newBot.setItemSlot(EquipmentSlot.CHEST, flying
-                ? gear(registries, Items.ELYTRA, new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1))
-                : armor(registries, Items.NETHERITE_CHESTPLATE));
-
-        Item weapon = switch (requested) {
-            case AXE -> Items.NETHERITE_AXE;
-            case MACE, ELYTRA_MACE, FIREWORK_MACE -> Items.MACE;
-            case CRYSTAL -> Items.END_CRYSTAL;
-            default -> Items.NETHERITE_SWORD;
-        };
-        newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, weapon,
+        newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE));
+        newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
                 new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
         newBot.setItemSlot(EquipmentSlot.OFFHAND, gear(registries, Items.SHIELD,
                 new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
@@ -258,7 +233,7 @@ public final class PracticeBotManager {
         }
         bot = newBot;
         mode = requested;
-        PracticeBotAi.reset(); // don't inherit a half-finished mace arc across a mode switch
+        PracticeBotAi.reset(); // don't carry velocity state across a mode switch
         onSuccess.run();
     }
 

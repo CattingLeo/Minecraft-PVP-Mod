@@ -4,11 +4,13 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"CameraMixin",
+		"FakePlayerHittableMixin",
 		"FogMixin",
 		"FovMixin",
 		"ExplosionParticleMixin",
 		"GuiMixin",
 		"HitMarkerMixin",
+		"ScreenRebuildAccessor",
 		"ScrollHotbarMixin",
 		"XrayMixin"
 	],

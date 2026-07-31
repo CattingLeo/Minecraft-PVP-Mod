@@ -39,6 +39,9 @@ public class ScrollHotbarMixin {
         }
     }
 
+    /** Only a scroll notch landing within this long after selecting a row counts as "bind scroll to this". */
+    private static final long SCROLL_BIND_GRACE_MS = 600L;
+
     /**
      * Fires the configured scroll action, letting the wheel drive something the way
      * a keybind would.
@@ -57,14 +60,24 @@ public class ScrollHotbarMixin {
         Minecraft mc = Minecraft.getInstance();
 
         // Key Binds screen with an action selected: assign the wheel to it, exactly as
-        // pressing a key there would. Cancelled so the same notch doesn't also scroll
-        // the list out from under the row being bound. Gui#screen() is 26.2's accessor
-        // -- Minecraft no longer exposes `screen` as a field.
-        if (mc.gui != null && mc.gui.screen() instanceof KeyBindsScreen binds && binds.selectedKey != null) {
+        // pressing a key there would -- but only within a short grace window after the
+        // row was selected (KeyBindsScreen#lastKeySelection, set by vanilla itself when
+        // you click a row). Without that window, EVERY scroll notch while ANY row sits
+        // in capture mode gets swallowed as "bind scroll", so the wheel can never be
+        // used to just scroll the list to look at other rows -- this was reported as
+        // "the scroll wheel is disabled" while setting a keybind. Past the window a
+        // scroll falls through to normal list scrolling instead.
+        if (mc.gui != null && mc.gui.screen() instanceof KeyBindsScreen binds && binds.selectedKey != null
+                && System.currentTimeMillis() - binds.lastKeySelection <= SCROLL_BIND_GRACE_MS) {
             binds.selectedKey.setKey(ScrollKeybind.SCROLL_KEY);
             binds.selectedKey = null;
             KeyMapping.resetMapping(); // rebuild key -> mapping lookup so it takes effect immediately
             mc.options.save();
+            // The row's displayed key name is only refreshed when its button is
+            // rebuilt, which normally happens when you click the row again -- forcing
+            // that here is what fixed "doesn't show it until you click to change it
+            // again" for a scroll-wheel bind specifically.
+            ((ScreenRebuildAccessor) binds).pvpkit$rebuildWidgets();
             ci.cancel();
             return;
         }
