@@ -87,6 +87,16 @@ public class PvpKitModMenu implements ModMenuApi {
                             "Stops the scroll wheel from changing your hotbar slot, freeing it up for other uses. "
                             + "GUI/inventory/chat scrolling is unaffected."))
                     .setSaveConsumer(v -> c.disableScrollHotbar = v).build());
+            combat.addEntry(e.startEnumSelector(Component.literal("Scroll UP action"),
+                            PvpKitConfig.ScrollAction.class, c.scrollUpAction)
+                    .setDefaultValue(PvpKitConfig.ScrollAction.NONE)
+                    .setTooltip(Component.literal("What scrolling up does, like a keybind on the wheel. Only fires while actually playing (not in menus/chat)."))
+                    .setSaveConsumer(v -> c.scrollUpAction = v).build());
+            combat.addEntry(e.startEnumSelector(Component.literal("Scroll DOWN action"),
+                            PvpKitConfig.ScrollAction.class, c.scrollDownAction)
+                    .setDefaultValue(PvpKitConfig.ScrollAction.NONE)
+                    .setTooltip(Component.literal("What scrolling down does. Pair with the toggle above to stop the wheel changing hotbar slots first."))
+                    .setSaveConsumer(v -> c.scrollDownAction = v).build());
             combat.addEntry(e.startBooleanToggle(Component.literal("Hotbar swap crosshair flash"), c.hotbarSwapFlash)
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("The crosshair flashes green every time you switch hotbar slots -- same mechanism as the red cooldown flash above."))

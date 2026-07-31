@@ -11,6 +11,43 @@ import net.fabricmc.loader.api.FabricLoader;
 /** Persisted settings for PvP Kit (config/pvpkit.json). Edited via Mod Menu -> PvP Kit. */
 public class PvpKitConfig {
 
+    /**
+     * What a scroll-wheel notch does, so the wheel can drive an action the way a
+     * keybind would. Done as a config choice rather than a real bindable key
+     * because the vanilla Key Binds screen can't capture a scroll event: in 26.2
+     * `mouseScrolled` is a default interface method that screen never overrides,
+     * so making it bindable there would mean merging an override that replaces the
+     * inherited dispatch which scrolls the keybind list itself.
+     */
+    public enum ScrollAction {
+        NONE("None"),
+        HOTBAR_NEXT("Hotbar: next slot"),
+        HOTBAR_PREV("Hotbar: previous slot"),
+        FULLBRIGHT("Toggle Fullbright"),
+        FREECAM("Toggle Freecam"),
+        LOCATOR("Toggle Locator Arrow"),
+        HUD("Toggle HUD"),
+        MODULE_HUD("Toggle Module HUD"),
+        AUTO_TOTEM("Toggle Auto Totem"),
+        AUTO_EAT("Toggle Auto Eat"),
+        CRITICALS("Toggle Criticals"),
+        KILL_AURA("Toggle Kill Aura"),
+        FLIGHT("Toggle Flight"),
+        NO_DAMAGE("Toggle No Damage");
+
+        public final String label;
+
+        ScrollAction(String label) {
+            this.label = label;
+        }
+
+        /** Cloth Config's enum selector uses toString() for the button text. */
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     public enum TotemCorner {
         TOP_LEFT("Top-left"),
         TOP_RIGHT("Top-right"),
@@ -56,6 +93,8 @@ public class PvpKitConfig {
     public boolean showHitMarker = true;
     public boolean hotbarSwapFlash = true;
     public boolean disableScrollHotbar = false;
+    public ScrollAction scrollUpAction = ScrollAction.NONE;
+    public ScrollAction scrollDownAction = ScrollAction.NONE;
 
     // --- Utility (see PvpKitClient javadoc for how each one works) ---
     public boolean autoTotem = false;
@@ -85,6 +124,8 @@ public class PvpKitConfig {
         }
         if (instance == null) instance = new PvpKitConfig();
         if (instance.totemCorner == null) instance.totemCorner = TotemCorner.TOP_RIGHT;
+        if (instance.scrollUpAction == null) instance.scrollUpAction = ScrollAction.NONE;
+        if (instance.scrollDownAction == null) instance.scrollDownAction = ScrollAction.NONE;
     }
 
     public static void save() {

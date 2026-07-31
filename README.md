@@ -70,6 +70,17 @@ toggle, on by default).
 - **Hotbar swap crosshair flash** — the crosshair flashes green every time you switch
   hotbar slots, using the same flash mechanism as the (red) cooldown-ready flash above.
 
+### Scroll wheel
+- **Disable scroll-wheel hotbar switching** — stops the wheel changing your hotbar slot,
+  freeing it for something else. GUI/inventory/chat scrolling is unaffected.
+- **Scroll UP / DOWN action** — pick what each wheel direction does, so the wheel works
+  like a keybind: hotbar next/previous, or toggle Fullbright, Freecam, Locator, HUD,
+  Module HUD, Auto Totem, Auto Eat, Criticals, Kill Aura, Flight, or No Damage. Only
+  fires while you're actually playing, not in menus or chat.
+
+  These are config dropdowns rather than real bindable keys because Minecraft's Key Binds
+  screen can't capture a scroll event at all — see [DEVELOPMENT.md](DEVELOPMENT.md).
+
 ### Freecam
 Detaches the view from your body so you can fly the camera around freely while your
 player stands frozen in place. WASD to move, space/shift for up/down, sprint to go
