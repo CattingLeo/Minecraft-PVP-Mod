@@ -3,8 +3,11 @@ package com.catting.pvpkit.mixin;
 import com.catting.pvpkit.PvpKitClient;
 import com.catting.pvpkit.PvpKitConfig;
 import com.catting.pvpkit.ScrollActions;
+import com.catting.pvpkit.ScrollKeybind;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.world.entity.player.Inventory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,11 +51,26 @@ public class ScrollHotbarMixin {
      * GLFW's scroll callback is (window, xOffset, yOffset); yOffset is the vertical
      * notch, positive for up.
      */
-    @Inject(method = "onScroll", at = @At("HEAD"))
+    @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
     private void pvpkit$scrollAction(long window, double xOffset, double yOffset, CallbackInfo ci) {
         if (yOffset == 0.0) return;
         Minecraft mc = Minecraft.getInstance();
+
+        // Key Binds screen with an action selected: assign the wheel to it, exactly as
+        // pressing a key there would. Cancelled so the same notch doesn't also scroll
+        // the list out from under the row being bound. Gui#screen() is 26.2's accessor
+        // -- Minecraft no longer exposes `screen` as a field.
+        if (mc.gui != null && mc.gui.screen() instanceof KeyBindsScreen binds && binds.selectedKey != null) {
+            binds.selectedKey.setKey(ScrollKeybind.SCROLL_KEY);
+            binds.selectedKey = null;
+            KeyMapping.resetMapping(); // rebuild key -> mapping lookup so it takes effect immediately
+            mc.options.save();
+            ci.cancel();
+            return;
+        }
+
         if (mc.player == null || !mc.mouseHandler.isMouseGrabbed()) return;
+        ScrollKeybind.fire();
         PvpKitConfig c = PvpKitConfig.get();
         ScrollActions.run(yOffset > 0.0 ? c.scrollUpAction : c.scrollDownAction);
     }
