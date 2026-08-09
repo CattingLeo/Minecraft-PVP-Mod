@@ -4,34 +4,39 @@ import net.fabricmc.fabric.api.entity.FakePlayer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /**
- * Combat behaviour for the practice bot. One mode active at a time, driven
- * from PracticeBotManager's END_SERVER_TICK hook (so everything here is
- * already on the server thread).
+ * Combat behaviour for the practice bot. One mode active at a time, driven from
+ * PracticeBotManager's END_SERVER_TICK hook (so everything here is already on the server
+ * thread).
  *
- * IMPORTANT -- why this is all hand-driven rather than using vanilla AI:
- * `FakePlayer#tick()` is a literal no-op (verified in the Fabric API
- * bytecode: the method body is just `return`). Nothing ticks the bot's
- * physics or applies gravity for us, so movement integrates its own
- * vertical velocity (`verticalVelocity` + `getGravity()`) but still goes
- * through `Entity#move(MoverType.SELF, ...)` for real collision resolution
- * -- the bot walks into walls and lands on ground properly instead of
- * clipping through terrain or teleporting to the player's Y.
+ * DELIBERATELY THIN. Everything physical is vanilla's job now: FakePlayerTickMixin runs the
+ * real ServerPlayer tick (Carpet's approach), so gravity, collision, friction, knockback
+ * integration, i-frame decay, item cooldowns, the shield's block delay, and pose/fall-flying
+ * maintenance all happen exactly as they do for a real player.
  *
- * FakePlayer is also not a `Mob`, so vanilla's goal/pathfinding system
- * isn't available to it even in principle -- it walks straight lines and
- * auto-steps single blocks, nothing smarter.
+ * An earlier version of this class hand-rolled every one of those, and every one of them was
+ * subtly wrong in a way that produced a visible bug -- invented friction constants that fought
+ * vanilla's knockback impulse, a shield that never satisfied its block delay, a bot stuck in
+ * the gliding pose being handed elytra physics. All of that is deleted rather than fixed:
+ * this class now only decides INTENT (where to look, whether to walk, whether to raise the
+ * shield) and leaves the simulation to the game.
+ *
+ * FakePlayer is not a `Mob`, so vanilla's goal/pathfinding is unavailable even in principle --
+ * movement is expressed as the same relative input a real player's WASD produces.
  */
 public final class PracticeBotAi {
 
     public enum Mode {
         IDLE("idle"),
         SHIELD("shield"),
-        DEFEND("defend");
+        DEFEND("defend"),
+        /** Locked in place: cannot be moved by anything -- knockback, explosions or its own AI. */
+        UNMOVEABLE("unmoveable");
 
         public final String label;
 
@@ -42,134 +47,145 @@ public final class PracticeBotAi {
 
     // --- tuning ---
     private static final double ENGAGE_RANGE = 24.0;   // ignore the player entirely beyond this
-    private static final double RETREAT_SPEED = 0.26;  // defend mode backs off slightly faster
     private static final double DEFEND_RANGE = 12.0;    // normal keep-away distance
     private static final double DEFEND_RANGE_THREATENED = 18.0; // wound up / airborne player
 
-    /** Our own vertical velocity, since FakePlayer never ticks its own physics. */
-    private static double verticalVelocity;
+    /** Where an UNMOVEABLE bot is pinned. Captured on its first tick, cleared on mode change. */
+    private static net.minecraft.world.phys.Vec3 lockPos;
 
     private PracticeBotAi() {
     }
 
-    /** Wipes carry-over state on a mode switch. */
+    /** Wipes carry-over state on a mode switch. Vanilla owns the physics state now, so there's nothing left to clear. */
     public static void reset() {
-        verticalVelocity = 0.0;
+        lockPos = null;
     }
 
     public static void tick(FakePlayer bot, Mode mode, ServerLevel level) {
-        // MUST run before the IDLE early-return, and every tick regardless of mode --
-        // see keepHittable()'s javadoc. This being mode-gated is exactly why the plain
-        // `/practicebot` dummy became unhittable after a single hit.
-        keepHittable(bot);
-
-        if (mode == Mode.IDLE) return;
+        restockTotem(bot);
 
         Player target = nearestRealPlayer(bot, level);
-        if (target == null) return;
-
-        // Face the player every tick regardless of mode -- SHIELD needs this too, since
-        // vanilla only blocks damage arriving from roughly the entity's front; without it
-        // the bot keeps facing wherever it spawned and the shield stops blocking the
-        // instant the player moves to a different angle.
-        bot.lookAt(EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
-
-        switch (mode) {
-            case SHIELD -> {
-                if (!bot.isUsingItem()) bot.startUsingItem(InteractionHand.OFF_HAND);
-            }
-            case DEFEND -> defend(bot, target);
-            default -> {
-            }
+        if (target != null) {
+            // Vanilla only blocks damage arriving from roughly the entity's front, so SHIELD
+            // needs this as much as the moving modes do.
+            bot.lookAt(EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
         }
+
+        if (mode == Mode.SHIELD) holdShield(bot);
+
+        // Movement INPUT, exactly what a real player's WASD sets. vanilla's aiStep() reads
+        // these and feeds them to travel() during the real tick -- we never move the bot
+        // ourselves. The bot always faces its target, so negative forward = back away.
+        //
+        // Zeroed during the hit-recoil window (hurtTime), so the bot's own walking
+        // acceleration doesn't immediately cancel out the knockback it just took.
+        bot.xxa = 0.0f;
+        bot.yya = 0.0f;
+        bot.zza = (mode == Mode.DEFEND && target != null && bot.hurtTime == 0 && shouldRetreat(bot, target))
+                ? -1.0f
+                : 0.0f;
+
+        if (mode == Mode.UNMOVEABLE) pinInPlace(bot);
+
+        diagnose(bot);
     }
 
     /**
-     * THE fix for "I can't hit him". Vanilla's damage entry point
-     * (`LivingEntity#hurt`) rejects any hit while `invulnerableTime > 0` --
-     * that's the normal ~0.5s i-frame window after every hit. Those counters
-     * are decremented in `Entity#tick`/`LivingEntity#tick`... which for a
-     * FakePlayer is a literal no-op. So the very first hit set
-     * `invulnerableTime = 20` and nothing ever brought it back down, leaving
-     * the bot permanently unhittable from then on. Both fields are public, so
-     * we just tick them down ourselves.
+     * Pins the bot to the spot it was summoned on -- it cannot be shifted by knockback,
+     * explosions, water, pistons or anything else.
      *
-     * Also keeps the bot alive by topping health back up when it gets low,
-     * rather than making it damage-immune. The previous approach (Resistance
-     * amplifier 255) reduced incoming damage to a flat 0, which meant hits
-     * registered no damage AND no knockback -- indistinguishable from the
-     * setInvulnerable(true) it was meant to replace. Letting damage land for
-     * real and healing afterwards keeps it genuinely unkillable while hits,
-     * knockback and hit animations all behave normally, and you can still see
-     * the health bar move so you know you're connecting.
+     * Runs at END_SERVER_TICK, i.e. AFTER vanilla's tick has already moved the entity, so it
+     * corrects rather than prevents: velocity is zeroed and the position snapped back the same
+     * tick anything displaced it. That ordering is deliberate -- the bot still takes real
+     * damage, real hit reactions and real totem pops (all of which happen earlier in the tick),
+     * it just never ends a tick anywhere other than where it started.
+     *
+     * The summon also gives this mode full knockback resistance, so vanilla mostly doesn't try
+     * to move it in the first place; this is the backstop that catches everything else.
      */
-    private static void keepHittable(FakePlayer bot) {
-        if (bot.invulnerableTime > 0) bot.invulnerableTime--;
-        if (bot.hurtTime > 0) bot.hurtTime--;
+    private static void pinInPlace(FakePlayer bot) {
+        if (lockPos == null) {
+            lockPos = bot.position();
+            return;
+        }
+        bot.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+        bot.setPos(lockPos.x, lockPos.y, lockPos.z);
+        bot.setOnGround(true); // otherwise it reads as perpetually falling and plays fall animations
+    }
 
-        float max = bot.getMaxHealth();
-        if (bot.getHealth() < max * 0.4f) {
-            bot.setHealth(max);
+    // ---- TEMPORARY DIAGNOSTICS (delete once knockback is confirmed) ----
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("pvpkit-bot");
+    private static int prevHurtTime;
+    private static int traceTicks;
+    private static net.minecraft.world.phys.Vec3 lastPos;
+
+    /** Logs the bot's real state for a few ticks after each hit, so knockback is diagnosed from numbers, not guesses. */
+    private static void diagnose(FakePlayer bot) {
+        net.minecraft.world.phys.Vec3 pos = bot.position();
+        net.minecraft.world.phys.Vec3 moved = lastPos == null ? net.minecraft.world.phys.Vec3.ZERO : pos.subtract(lastPos);
+        lastPos = pos;
+
+        if (bot.hurtTime > prevHurtTime) {
+            traceTicks = 12;
+            LOG.info("[practicebot] HIT kbRes={} realTicks={} dm={} onGround={} pose={} fallFlying={} iframes={} blocking={}",
+                    String.format("%.2f", bot.getAttributeValue(
+                            net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE)),
+                    PracticeBotManager.tickCount(), fmt(bot.getDeltaMovement()), bot.onGround(),
+                    bot.getPose(), bot.isFallFlying(), bot.invulnerableTime, bot.isBlocking());
+        }
+        prevHurtTime = bot.hurtTime;
+
+        if (traceTicks > 0) {
+            LOG.info("[practicebot]  t{} dm={} moved={} ({} blocks) onGround={}",
+                    12 - traceTicks, fmt(bot.getDeltaMovement()), fmt(moved),
+                    String.format("%.3f", moved.length()), bot.onGround());
+            traceTicks--;
         }
     }
 
-    // ---- modes ----
+    private static String fmt(net.minecraft.world.phys.Vec3 v) {
+        return String.format("(%.3f, %.3f, %.3f)", v.x, v.y, v.z);
+    }
 
-    /** Backs away, and backs away harder when the player is winding up something big (airborne / mace out). */
-    private static void defend(FakePlayer bot, Player target) {
-        double dist = bot.position().distanceTo(target.position());
-        boolean threatened = !target.onGround() || target.getMainHandItem().is(net.minecraft.world.item.Items.MACE);
+    /** Backs off, and backs off sooner when the player is winding up something big (airborne / mace out). */
+    private static boolean shouldRetreat(FakePlayer bot, Player target) {
+        boolean threatened = !target.onGround() || target.getMainHandItem().is(Items.MACE);
         double keepAway = threatened ? DEFEND_RANGE_THREATENED : DEFEND_RANGE;
-        if (dist < keepAway) {
-            step(bot, target, RETREAT_SPEED, false); // false = away from
-        }
+        return bot.position().distanceTo(target.position()) < keepAway;
     }
-
-    // ---- helpers ----
 
     /**
-     * One collision-aware movement step toward (or away from) the target, letting
-     * gravity handle the vertical axis.
+     * Raises the shield, and respects an axe disable.
      *
-     * Uses `Entity#move(MoverType.SELF, ...)` rather than `setPos`: move() runs
-     * vanilla's full collision resolution (so the bot walks into walls instead of
-     * clipping through them, and lands on ground instead of sinking) and updates
-     * `onGround()` as a side effect. Because FakePlayer#tick() is a no-op, nothing
-     * else applies gravity for us, so we integrate our own vertical velocity here.
+     * The block delay and the cooldown countdown are vanilla's job again now that the bot
+     * really ticks -- the only thing needed here is to not re-raise the shield the instant an
+     * axe knocks it down, which would make the axe/shield-break loop impossible to practise.
      */
-    private static void step(FakePlayer bot, Player target, double speed, boolean toward) {
-        Vec3 pos = bot.position();
-        Vec3 dest = target.position();
-        double dx = dest.x - pos.x;
-        double dz = dest.z - pos.z;
-        double len = Math.sqrt(dx * dx + dz * dz);
-        double sign = toward ? 1.0 : -1.0;
-        double mx = len < 1.0e-4 ? 0.0 : (dx / len) * speed * sign;
-        double mz = len < 1.0e-4 ? 0.0 : (dz / len) * speed * sign;
-        moveWithGravity(bot, mx, mz);
+    private static void holdShield(FakePlayer bot) {
+        if (bot.getCooldowns().isOnCooldown(bot.getMainHandItem())) {
+            if (bot.isUsingItem()) bot.stopUsingItem();
+            return;
+        }
+        // MAIN hand: the offhand permanently holds the bot's totem (see PracticeBotManager).
+        if (!bot.isUsingItem()) bot.startUsingItem(InteractionHand.MAIN_HAND);
     }
 
-    /** Applies gravity + a horizontal step through vanilla collision. Also auto-steps up single blocks. */
-    private static void moveWithGravity(FakePlayer bot, double mx, double mz) {
-        if (bot.onGround()) {
-            verticalVelocity = 0.0;
-        } else {
-            verticalVelocity -= bot.getGravity();
-            if (verticalVelocity < -3.0) verticalVelocity = -3.0; // terminal velocity clamp
-        }
-
-        double beforeX = bot.position().x;
-        double beforeZ = bot.position().z;
-        bot.move(MoverType.SELF, new Vec3(mx, verticalVelocity, mz));
-
-        // If collision fully blocked the horizontal step while grounded, try a single-block
-        // step up -- otherwise the bot gets permanently stuck on any 1-high ledge, since it
-        // has no jump input of its own.
-        boolean blocked = Math.abs(bot.position().x - beforeX) < 1.0e-3
-                && Math.abs(bot.position().z - beforeZ) < 1.0e-3;
-        if (blocked && bot.onGround() && (mx != 0.0 || mz != 0.0)) {
-            bot.move(MoverType.SELF, new Vec3(0.0, 1.0, 0.0));
-            bot.move(MoverType.SELF, new Vec3(mx, 0.0, mz));
+    /**
+     * Keeps the bot alive the way a real player does -- by popping a totem.
+     *
+     * The offhand is restocked every tick so the supply is effectively infinite, but each
+     * death is a REAL vanilla totem activation: the pop animation plays, health drops to half
+     * a heart, and vanilla's own post-totem Regeneration/Absorption kick in. That's far more
+     * useful to practise against than damage immunity or silent healing, both of which made
+     * hits feel like they weren't landing.
+     *
+     * Restocking happens AFTER the pop (vanilla consumes the stack during the lethal hit), so
+     * there's a one-tick window with an empty offhand. Two lethal hits in a single tick would
+     * kill the bot -- attack cooldowns make that unreachable in practice.
+     */
+    private static void restockTotem(FakePlayer bot) {
+        if (!bot.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) {
+            bot.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.TOTEM_OF_UNDYING));
         }
     }
 

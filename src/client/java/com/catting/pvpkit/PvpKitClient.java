@@ -22,14 +22,10 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * PvP Kit (client-side). Configure in Mod Menu -> PvP Kit.
@@ -56,16 +52,12 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean TOTEM_FLASH = true;
 
     public static boolean NO_SLOWNESS_FOV = true;
+    public static boolean NO_SPEED_FOV = true;
     public static boolean NO_NAUSEA = true;
     public static boolean NO_HURT_TILT = true;
     public static boolean NO_DARKNESS = true;
     public static boolean NO_BLINDNESS = true;
     public static boolean FULLBRIGHT = true;
-
-    // ---- Locator arrow (tracks ONE named player; see README for fair-use note) ----
-    public static boolean LOCATOR_ENABLED = false;
-    public static boolean LOCATOR_DISABLE_IN_SPECTATOR = true;
-    public static boolean LOCATOR_SHOW_THROUGH_WALLS = false;
 
     public static boolean NO_CRYSTAL_EXPLOSION = true;
     public static boolean COOLDOWN_FLASH = true;
@@ -73,11 +65,10 @@ public class PvpKitClient implements ClientModInitializer {
     public static boolean HOTBAR_SWAP_FLASH = true;
     public static boolean DISABLE_SCROLL_HOTBAR = false;
 
-    // ---- Utility (Auto Totem / Auto Eat / Criticals / module HUD) ----
+    // ---- Utility (Auto Totem / Auto Eat) ----
     public static boolean AUTO_TOTEM = false;
     public static boolean AUTO_EAT = false;
     public static int AUTO_EAT_HUNGER_THRESHOLD = 14;
-    public static boolean CRITICALS = false;
 
     // ---- Xray (see XrayBlocks / README Fair use) ----
     public static boolean XRAY_ENABLED = false;
@@ -102,17 +93,13 @@ public class PvpKitClient implements ClientModInitializer {
         TOTEM_POP = c.totemPop; HIDE_CENTER_TOTEM = c.hideCenterTotem;
         TOTEM_CORNER = c.totemCorner.ordinal(); TOTEM_PEAK = c.totemSizePct / 100.0f;
         TOTEM_FLASH = c.totemFlash;
-        NO_SLOWNESS_FOV = c.noSlownessFov; NO_NAUSEA = c.noNausea; NO_HURT_TILT = c.noHurtTilt;
+        NO_SLOWNESS_FOV = c.noSlownessFov; NO_SPEED_FOV = c.noSpeedFov; NO_NAUSEA = c.noNausea; NO_HURT_TILT = c.noHurtTilt;
         NO_DARKNESS = c.noDarkness; NO_BLINDNESS = c.noBlindness;
         FULLBRIGHT = c.fullbright;
-        LOCATOR_ENABLED = c.locatorEnabled;
-        LOCATOR_DISABLE_IN_SPECTATOR = c.locatorDisableInSpectator;
-        LOCATOR_SHOW_THROUGH_WALLS = c.locatorShowThroughWalls;
         NO_CRYSTAL_EXPLOSION = c.noCrystalExplosion; COOLDOWN_FLASH = c.cooldownFlash;
         SHOW_HIT_MARKER = c.showHitMarker;
         HOTBAR_SWAP_FLASH = c.hotbarSwapFlash; DISABLE_SCROLL_HOTBAR = c.disableScrollHotbar;
         AUTO_TOTEM = c.autoTotem; AUTO_EAT = c.autoEat; AUTO_EAT_HUNGER_THRESHOLD = c.autoEatHungerThreshold;
-        CRITICALS = c.criticals;
         XRAY_ENABLED = c.xrayEnabled;
         XRAY_COAL = c.xrayCoal; XRAY_IRON = c.xrayIron; XRAY_COPPER = c.xrayCopper; XRAY_GOLD = c.xrayGold;
         XRAY_REDSTONE = c.xrayRedstone; XRAY_LAPIS = c.xrayLapis; XRAY_EMERALD = c.xrayEmerald;
@@ -200,7 +187,6 @@ public class PvpKitClient implements ClientModInitializer {
 
     private static final long HIT_MARKER_MS = 180L;
     private static long hitMarkerStart = -1L;
-    private static Player lastGlowTarget = null;
 
     /** Called from HitMarkerMixin when the local player's attack swing lands. */
     public static void triggerHitMarker() {
@@ -266,6 +252,9 @@ public class PvpKitClient implements ClientModInitializer {
         FreecamManager.init();
         ScrollKeybind.init();
         MultiBindManager.init();
+        MacroManager.init();
+        MacroBindings.sync(); // re-register extra keys saved from a previous session
+        MacroTabsHook.init();
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientEntityEvents.ENTITY_LOAD.register((entity, world) -> {
@@ -321,24 +310,8 @@ public class PvpKitClient implements ClientModInitializer {
             lastHotbarSlot = slot;
         }
 
-        if (CRITICALS) updateCriticals(mc);
         if (AUTO_TOTEM) updateAutoTotem(mc);
         if (AUTO_EAT) updateAutoEat(mc);
-    }
-
-    /**
-     * Auto-crit: rather than faking the server-validated fall-distance check
-     * (which a real server computes itself from your synced position, so a
-     * purely client-side "pretend I fell" flag wouldn't actually apply),
-     * this just keeps you continuously hopping while on the ground -- the
-     * same legal, entirely-manual "bunny hop" technique good PvP players
-     * already use to crit every hit, just automated so you don't have to
-     * time it yourself. `LivingEntity#jumpFromGround` is the exact call the
-     * space bar itself triggers.
-     */
-    private void updateCriticals(Minecraft mc) {
-        if (mc.player == null || !mc.player.onGround() || mc.player.isPassenger()) return;
-        mc.player.jumpFromGround();
     }
 
     /**
@@ -456,7 +429,6 @@ public class PvpKitClient implements ClientModInitializer {
         if (COOLDOWN_FLASH) renderCrosshairFlash(graphics, mc);
         if (HOTBAR_SWAP_FLASH) renderHotbarSwapFlash(graphics, mc);
         if (SHOW_HIT_MARKER) renderHitMarker(graphics, mc);
-        renderLocatorArrow(graphics, mc); // always called so it can self-clean any glow tag
         renderToast(graphics, mc);
 
         long now = System.currentTimeMillis();
@@ -559,176 +531,6 @@ public class PvpKitClient implements ClientModInitializer {
         // bottom-right
         g.fill(cx + offset, cy + offset - thick, cx + offset + arm, cy + offset, color);
         g.fill(cx + offset - thick, cy + offset, cx + offset, cy + offset + arm, color);
-    }
-
-    /**
-     * Points a fancy arrow at the screen edge/corner toward your nearest other player.
-     * No name entry, one on/off toggle. Hides automatically once they're both within
-     * your rough FOV AND you have a clear line of sight (real wall-blocking raycast via
-     * Level#clip — long-standing vanilla API, not a mixin, so this part has no
-     * "wrong class name" risk).
-     *
-     * INTENDED USE: private LAN sessions with friends you've invited yourself, where
-     * everyone present is someone you know and there's no server rule/anti-cheat this
-     * conflicts with — comparable to a co-op friend-finder. On a public competitive
-     * server against strangers who haven't agreed to it, this same feature is a generic
-     * enemy tracer/ESP, the exact thing most PvP anti-cheats are built to catch — don't
-     * use it there.
-     *
-     * "Lobby" can't be reliably detected client-side (that's server-side info), so the
-     * one concrete auto-disable is Spectator mode (LOCATOR_DISABLE_IN_SPECTATOR).
-     */
-    private void renderLocatorArrow(GuiGraphicsExtractor g, Minecraft mc) {
-        if (!LOCATOR_ENABLED || mc.player == null || mc.level == null
-                || (LOCATOR_DISABLE_IN_SPECTATOR && mc.player.isSpectator())) {
-            clearGlowTarget();
-            return;
-        }
-
-        Player target = null;
-        double bestDist = Double.MAX_VALUE;
-        for (Player p : mc.level.players()) {
-            if (p == mc.player) continue;
-            double d = p.distanceToSqr(mc.player);
-            if (d < bestDist) {
-                bestDist = d;
-                target = p;
-            }
-        }
-        if (target == null) {
-            clearGlowTarget();
-            return; // no other players loaded/nearby right now
-        }
-
-        Vec3 eye = mc.player.getEyePosition(1.0f);
-        Vec3 targetEye = target.getEyePosition(1.0f);
-
-        // Rough horizontal FOV check (fixed estimate rather than reading the live FOV
-        // option, to avoid depending on another renameable API for a cosmetic check).
-        double dx = targetEye.x - eye.x;
-        double dz = targetEye.z - eye.z;
-        double dist = Math.sqrt(dx * dx + dz * dz);
-        float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float playerYaw = mc.player.getViewYRot(1.0f);
-        float angleDiff = wrapDegrees(targetYaw - playerYaw);
-        boolean inFov = Math.abs(angleDiff) < 40.0f; // ~80 deg horizontal FOV estimate
-
-        boolean losBlocked = true;
-        if (inFov) {
-            var clip = new ClipContext(eye, targetEye, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player);
-            var hit = mc.level.clip(clip);
-            losBlocked = hit.getType() != HitResult.Type.MISS;
-        }
-        boolean hidden = !(inFov && !losBlocked);
-        updateGlowTarget(hidden ? target : null);
-        if (!hidden) return; // you can actually see them -> hide the arrow too
-
-        int w = mc.getWindow().getGuiScaledWidth();
-        int h = mc.getWindow().getGuiScaledHeight();
-        int cx = w / 2, cy = h / 2;
-
-        // Direction from screen centre, in screen space: 0 rad = up, clockwise.
-        double angleRad = Math.toRadians(angleDiff);
-        double dirX = Math.sin(angleRad);
-        double dirY = -Math.cos(angleRad);
-
-        // Clamp to the screen's edge rectangle (naturally lands in a corner for
-        // diagonal directions) with a margin so it doesn't sit flush on the pixel edge.
-        int margin = 22;
-        double halfW = w / 2.0 - margin, halfH = h / 2.0 - margin;
-        double scale = Math.min(
-                dirX != 0 ? halfW / Math.abs(dirX) : Double.MAX_VALUE,
-                dirY != 0 ? halfH / Math.abs(dirY) : Double.MAX_VALUE);
-        int ax = cx + (int) Math.round(dirX * scale);
-        int ay = cy + (int) Math.round(dirY * scale);
-
-        // Gentle pulse so it reads as "fancy" rather than static.
-        float pulse = 0.75f + 0.25f * (float) Math.sin(System.currentTimeMillis() / 200.0);
-        int alpha = (int) (255 * pulse);
-        int gold = (alpha << 24) | 0xE8B84B;
-
-        drawRotatedTriangle(g, ax, ay, angleRad, 9, 7, gold);
-
-        String label = (int) dist + "m";
-        int lw = mc.font.width(label);
-        int tx = ax - lw / 2;
-        int ty = ay + (dirY >= 0 ? 10 : -18);
-        g.text(mc.font, label, tx, ty, 0xFFFFFFFF, true);
-    }
-
-    /** Wraps a degree value into the range -180 to 180. */
-    private static float wrapDegrees(float deg) {
-        float d = deg % 360.0f;
-        if (d >= 180.0f) d -= 360.0f;
-        if (d < -180.0f) d += 360.0f;
-        return d;
-    }
-
-    /**
-     * Rasterizes a small triangle "arrowhead" pointing along angleRad (0 = up,
-     * clockwise), tip-first, using only axis-aligned fill() calls (scanline fill) —
-     * deliberately avoids any pose-rotation API so this has zero new-API compile risk.
-     */
-    private void drawRotatedTriangle(GuiGraphicsExtractor g, int cx, int cy, double angleRad,
-                                      int length, int halfWidth, int color) {
-        double s = Math.sin(angleRad), c = Math.cos(angleRad);
-        double[] lx = {0, -halfWidth, halfWidth};
-        double[] ly = {-length, length * 0.6, length * 0.6};
-        int[] px = new int[3], py = new int[3];
-        for (int i = 0; i < 3; i++) {
-            px[i] = cx + (int) Math.round(lx[i] * c + ly[i] * s);
-            py[i] = cy + (int) Math.round(-lx[i] * s + ly[i] * c);
-        }
-        int minY = Math.min(py[0], Math.min(py[1], py[2]));
-        int maxY = Math.max(py[0], Math.max(py[1], py[2]));
-        for (int y = minY; y <= maxY; y++) {
-            double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE;
-            for (int e = 0; e < 3; e++) {
-                int x1 = px[e], y1 = py[e], x2 = px[(e + 1) % 3], y2 = py[(e + 1) % 3];
-                if (y1 == y2) continue;
-                if ((y >= y1 && y < y2) || (y >= y2 && y < y1)) {
-                    double t = (y - y1) / (double) (y2 - y1);
-                    double x = x1 + t * (x2 - x1);
-                    minX = Math.min(minX, x);
-                    maxX = Math.max(maxX, x);
-                }
-            }
-            if (minX <= maxX) {
-                g.fill((int) Math.round(minX), y, (int) Math.round(maxX) + 1, y + 1, color);
-            }
-        }
-    }
-
-    /**
-     * Uses vanilla's built-in "glowing tag" — the same client-only mechanic Spectator
-     * mode uses to outline whatever entity you're looking at through walls — rather
-     * than building custom translucent-through-wall rendering. This reuses proven,
-     * already-working vanilla rendering instead of a new render mixin, so it carries
-     * far less risk than most of today's other changes: if the method name below is
-     * off, it's a plain compile error naming the exact symbol, not a runtime crash.
-     *
-     * Only active while LOCATOR_SHOW_THROUGH_WALLS is on AND the target is currently
-     * hidden from you (same visibility check as the arrow). Purely a local visual
-     * override — never touches the server, never affects anyone else's game.
-     */
-    private void updateGlowTarget(Player target) {
-        if (!LOCATOR_SHOW_THROUGH_WALLS) {
-            clearGlowTarget();
-            return;
-        }
-        if (target == lastGlowTarget) return; // already correct, nothing to change
-        clearGlowTarget();
-        if (target != null) {
-            target.setGlowingTag(true);
-            lastGlowTarget = target;
-        }
-    }
-
-    private void clearGlowTarget() {
-        if (lastGlowTarget != null) {
-            lastGlowTarget.setGlowingTag(false);
-            lastGlowTarget = null;
-        }
     }
 
     /**

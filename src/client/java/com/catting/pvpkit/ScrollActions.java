@@ -29,7 +29,6 @@ public final class ScrollActions {
             case HOTBAR_PREV -> shiftHotbar(mc, -1);
             case FULLBRIGHT -> toggle(c -> c.fullbright = !c.fullbright);
             case FREECAM -> FreecamManager.toggle();
-            case LOCATOR -> toggle(c -> c.locatorEnabled = !c.locatorEnabled);
             case HUD -> toggle(c -> {
                 boolean v = !c.showFps;
                 c.showFps = v;
@@ -45,7 +44,6 @@ public final class ScrollActions {
             }
             case AUTO_TOTEM -> toggle(c -> c.autoTotem = !c.autoTotem);
             case AUTO_EAT -> toggle(c -> c.autoEat = !c.autoEat);
-            case CRITICALS -> toggle(c -> c.criticals = !c.criticals);
             case KILL_AURA -> toggleNoCooldown(c -> c.killAura = !c.killAura);
             case FLIGHT -> toggleNoCooldown(c -> c.flightEnabled = !c.flightEnabled);
             case NO_DAMAGE -> toggleNoCooldown(c -> c.noDamage = !c.noDamage);

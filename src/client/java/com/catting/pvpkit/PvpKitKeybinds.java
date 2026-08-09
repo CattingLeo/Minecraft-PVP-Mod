@@ -59,7 +59,6 @@ public final class PvpKitKeybinds {
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath(PvpKitClient.MOD_ID, "pvp_kit"));
 
     private static final KeyMapping TOGGLE_FULLBRIGHT = bind("toggle_fullbright");
-    private static final KeyMapping TOGGLE_LOCATOR = bind("toggle_locator");
     private static final KeyMapping TOGGLE_HIT_MARKER = bind("toggle_hit_marker");
     private static final KeyMapping TOGGLE_COOLDOWN_FLASH = bind("toggle_cooldown_flash");
     private static final KeyMapping TOGGLE_CRYSTAL_EXPLOSION = bind("toggle_crystal_explosion");
@@ -70,7 +69,6 @@ public final class PvpKitKeybinds {
     private static final KeyMapping TOGGLE_RECORDING = bind("toggle_recording");
     private static final KeyMapping TOGGLE_AUTO_TOTEM = bind("toggle_auto_totem");
     private static final KeyMapping TOGGLE_AUTO_EAT = bind("toggle_auto_eat");
-    private static final KeyMapping TOGGLE_CRITICALS = bind("toggle_criticals");
     private static final KeyMapping TOGGLE_FREECAM = bind("toggle_freecam");
     private static final KeyMapping TOGGLE_XRAY = bind("toggle_xray");
     // Deliberately bound by default (every other keybind in this mod starts
@@ -115,7 +113,6 @@ public final class PvpKitKeybinds {
 
     private static void onTick(Minecraft mc) {
         while (TOGGLE_FULLBRIGHT.consumeClick()) toggle(c -> c.fullbright = !c.fullbright);
-        while (TOGGLE_LOCATOR.consumeClick()) toggle(c -> c.locatorEnabled = !c.locatorEnabled);
         while (TOGGLE_HIT_MARKER.consumeClick()) toggle(c -> c.showHitMarker = !c.showHitMarker);
         while (TOGGLE_COOLDOWN_FLASH.consumeClick()) toggle(c -> c.cooldownFlash = !c.cooldownFlash);
         while (TOGGLE_CRYSTAL_EXPLOSION.consumeClick()) toggle(c -> c.noCrystalExplosion = !c.noCrystalExplosion);
@@ -138,7 +135,6 @@ public final class PvpKitKeybinds {
         while (TOGGLE_RECORDING.consumeClick()) toggleRecording(mc);
         while (TOGGLE_AUTO_TOTEM.consumeClick()) toggle(c -> c.autoTotem = !c.autoTotem);
         while (TOGGLE_AUTO_EAT.consumeClick()) toggle(c -> c.autoEat = !c.autoEat);
-        while (TOGGLE_CRITICALS.consumeClick()) toggle(c -> c.criticals = !c.criticals);
         while (TOGGLE_FREECAM.consumeClick()) FreecamManager.toggle();
         while (TOGGLE_XRAY.consumeClick()) toggle(c -> c.xrayEnabled = !c.xrayEnabled);
         while (TOGGLE_MODULE_HUD.consumeClick()) toggleModuleScreen(mc);

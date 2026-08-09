@@ -1,5 +1,6 @@
 package com.catting.pvpkit.mixin;
 
+import com.catting.pvpkit.MacroKeyCapture;
 import com.catting.pvpkit.PvpKitClient;
 import com.catting.pvpkit.PvpKitConfig;
 import com.catting.pvpkit.ScrollActions;
@@ -67,6 +68,19 @@ public class ScrollHotbarMixin {
         // used to just scroll the list to look at other rows -- this was reported as
         // "the scroll wheel is disabled" while setting a keybind. Past the window a
         // scroll falls through to normal list scrolling instead.
+        // A "+"-added duplicate row waiting for a key. Checked BEFORE the vanilla-row case
+        // below, because that one only ever consults KeyBindsScreen#selectedKey -- which
+        // vanilla sets for its OWN rows. A duplicate row is this mod's own widget, so vanilla
+        // never sets it and the wheel simply could not be bound to a duplicate at all.
+        if (MacroKeyCapture.active()) {
+            MacroKeyCapture.accept(ScrollKeybind.SCROLL_KEY);
+            if (mc.gui != null && mc.gui.screen() != null) {
+                ((ScreenRebuildAccessor) mc.gui.screen()).pvpkit$rebuildWidgets();
+            }
+            ci.cancel();
+            return;
+        }
+
         if (mc.gui != null && mc.gui.screen() instanceof KeyBindsScreen binds && binds.selectedKey != null
                 && System.currentTimeMillis() - binds.lastKeySelection <= SCROLL_BIND_GRACE_MS) {
             binds.selectedKey.setKey(ScrollKeybind.SCROLL_KEY);

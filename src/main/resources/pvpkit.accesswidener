@@ -1,8 +1,11 @@
 accessWidener	v2	official
 
-# Entity#setSharedFlag(int, boolean) is protected; flag 7 is the fall-flying/gliding
-# flag (confirmed from LivingEntity#isFallFlying's bytecode: `bipush 7; getSharedFlag`).
-# The practice bot's elytra/firework mace modes need to set it so the wings actually
-# open mid-dive -- there is no public "start gliding" API (real players only ever get
-# there via a ServerboundPlayerCommandPacket, which a FakePlayer never sends).
-accessible	method	net/minecraft/world/entity/Entity	setSharedFlag	(IZ)V
+# NOTE: an entry for Entity#unsetRemoved used to live here, for a discard/re-add
+# re-spawn hack that turned out to leave a ghost copy of the bot on the client.
+# That hack is gone (see PracticeBotManager#performSummon), so the access is unused.
+
+# NOTE: entries for Entity#setSharedFlag and LivingEntity#useItemRemaining used to live
+# here. Both existed only to hand-maintain per-tick state that FakePlayer#tick() never
+# ran (clearing the stuck fall-flying flag; counting down the shield's block delay).
+# FakePlayerTickMixin now runs the real player tick instead -- Carpet's approach -- so
+# vanilla maintains both itself and the widened access is no longer needed.

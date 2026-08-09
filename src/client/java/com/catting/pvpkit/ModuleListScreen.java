@@ -43,11 +43,9 @@ public class ModuleListScreen extends Screen {
         int y = MARGIN;
 
         y = row(x, y, "Fullbright", () -> c.fullbright, v -> { c.fullbright = v; save(); });
-        y = row(x, y, "Locator", () -> c.locatorEnabled, v -> { c.locatorEnabled = v; save(); });
         y = row(x, y, "Cooldown Flash", () -> c.cooldownFlash, v -> { c.cooldownFlash = v; save(); });
         y = row(x, y, "Auto Totem", () -> c.autoTotem, v -> { c.autoTotem = v; save(); });
         y = row(x, y, "Auto Eat", () -> c.autoEat, v -> { c.autoEat = v; save(); });
-        y = row(x, y, "Criticals", () -> c.criticals, v -> { c.criticals = v; save(); });
         y = row(x, y, "Xray", () -> c.xrayEnabled, v -> { c.xrayEnabled = v; save(); });
         y = row(x, y, "Freecam", FreecamManager::isActive, v -> FreecamManager.toggle());
         y += GAP * 2;

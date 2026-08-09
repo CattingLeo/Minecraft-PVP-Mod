@@ -25,12 +25,10 @@ public class PvpKitConfig {
         HOTBAR_PREV("Hotbar: previous slot"),
         FULLBRIGHT("Toggle Fullbright"),
         FREECAM("Toggle Freecam"),
-        LOCATOR("Toggle Locator Arrow"),
         HUD("Toggle HUD"),
         MODULE_HUD("Toggle Module HUD"),
         AUTO_TOTEM("Toggle Auto Totem"),
         AUTO_EAT("Toggle Auto Eat"),
-        CRITICALS("Toggle Criticals"),
         KILL_AURA("Toggle Kill Aura"),
         FLIGHT("Toggle Flight"),
         NO_DAMAGE("Toggle No Damage"),
@@ -77,16 +75,12 @@ public class PvpKitConfig {
 
     // --- Clean view ---
     public boolean noSlownessFov = true;
+    public boolean noSpeedFov = true;
     public boolean noNausea = true;
     public boolean noHurtTilt = true;
     public boolean noDarkness = true;
     public boolean noBlindness = true;
     public boolean fullbright = true;
-
-    // --- Locator (points to ONE named player; see PvpKitClient javadoc for fair-use note) ---
-    public boolean locatorEnabled = false;
-    public boolean locatorDisableInSpectator = true;
-    public boolean locatorShowThroughWalls = false;
 
     // --- Combat ---
     public boolean noCrystalExplosion = true;
@@ -101,7 +95,6 @@ public class PvpKitConfig {
     public boolean autoTotem = false;
     public boolean autoEat = false;
     public int autoEatHungerThreshold = 14;
-    public boolean criticals = false;
 
     // --- Xray (see PvpKitClient javadoc / README Fair use) ---
     public boolean xrayEnabled = false;

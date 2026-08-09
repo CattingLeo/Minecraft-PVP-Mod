@@ -3,7 +3,7 @@
 	"id": "pvpkit",
 	"version": "${version}",
 	"name": ".PVP KIT",
-	"description": "Client-side PvP toolkit: HUD, totem corner pop, clean-view, crystal-only explosions, hit marker, locator arrow, and a No Cooldown page for private-world sandbox toggles.",
+	"description": "Client-side PvP toolkit: HUD, totem corner pop, clean-view, crystal-only explosions, hit marker, Xray, Keybinds/Macros, and a No Cooldown page for private-world sandbox toggles.",
 	"authors": [
 		"Catting"
 	],

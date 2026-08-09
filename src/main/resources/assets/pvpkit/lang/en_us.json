@@ -2,7 +2,6 @@
 	"key.category.pvpkit.pvp_kit": "PvP Kit",
 	"key.mouse.10": "Scroll Wheel",
 	"key.pvpkit.toggle_fullbright": "Toggle Fullbright",
-	"key.pvpkit.toggle_locator": "Toggle Locator Arrow",
 	"key.pvpkit.toggle_hit_marker": "Toggle Hit Marker",
 	"key.pvpkit.toggle_cooldown_flash": "Toggle Cooldown Flash",
 	"key.pvpkit.toggle_crystal_explosion": "Toggle Crystal-Only Explosion Removal",
@@ -13,7 +12,7 @@
 	"key.pvpkit.toggle_recording": "Start/Stop Recording",
 	"key.pvpkit.toggle_auto_totem": "Toggle Auto Totem",
 	"key.pvpkit.toggle_auto_eat": "Toggle Auto Eat",
-	"key.pvpkit.toggle_criticals": "Toggle Criticals",
 	"key.pvpkit.toggle_freecam": "Toggle Freecam",
+	"key.pvpkit.toggle_xray": "Toggle Xray",
 	"key.pvpkit.toggle_module_hud": "Toggle Module HUD"
 }

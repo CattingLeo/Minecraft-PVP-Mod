@@ -11,7 +11,12 @@ import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.network.chat.Component;
 
-/** Mod Menu -> PVP -> full settings screen (Cloth Config). */
+/**
+ * Mod Menu -> PVP -> full settings screen (Cloth Config), across 6 pages: Display
+ * (was HUD + Totem), Clean View, Combat (was Combat + Utility), Xray, Multi Bind,
+ * No Cooldown. Consolidated down from 9 pages (dropping the separate HUD/Totem/
+ * Utility categories and Locator, which was removed outright) at the user's request.
+ */
 public class PvpKitModMenu implements ModMenuApi {
 
     @Override
@@ -30,32 +35,29 @@ public class PvpKitModMenu implements ModMenuApi {
             });
             ConfigEntryBuilder e = b.entryBuilder();
 
-            // ---------------- HUD ----------------
-            ConfigCategory hud = b.getOrCreateCategory(Component.literal("HUD"));
-            hud.addEntry(e.startBooleanToggle(Component.literal("Show FPS"), c.showFps)
+            // ---------------- Display (HUD + Totem) ----------------
+            ConfigCategory display = b.getOrCreateCategory(Component.literal("Display"));
+            display.addEntry(e.startBooleanToggle(Component.literal("Show FPS"), c.showFps)
                     .setDefaultValue(true).setSaveConsumer(v -> c.showFps = v).build());
-            hud.addEntry(e.startBooleanToggle(Component.literal("Show CPS"), c.showCps)
+            display.addEntry(e.startBooleanToggle(Component.literal("Show CPS"), c.showCps)
                     .setDefaultValue(true).setSaveConsumer(v -> c.showCps = v).build());
-            hud.addEntry(e.startBooleanToggle(Component.literal("Show Ping"), c.showPing)
+            display.addEntry(e.startBooleanToggle(Component.literal("Show Ping"), c.showPing)
                     .setDefaultValue(true).setSaveConsumer(v -> c.showPing = v).build());
-            hud.addEntry(e.startBooleanToggle(Component.literal("Rainbow (RGB) text"), c.rainbowText)
+            display.addEntry(e.startBooleanToggle(Component.literal("Rainbow (RGB) text"), c.rainbowText)
                     .setDefaultValue(true).setSaveConsumer(v -> c.rainbowText = v).build());
-            hud.addEntry(e.startIntField(Component.literal("HUD X (negative = from right)"), c.hudX)
+            display.addEntry(e.startIntField(Component.literal("HUD X (negative = from right)"), c.hudX)
                     .setDefaultValue(6).setSaveConsumer(v -> c.hudX = v).build());
-            hud.addEntry(e.startIntField(Component.literal("HUD Y (negative = from bottom)"), c.hudY)
+            display.addEntry(e.startIntField(Component.literal("HUD Y (negative = from bottom)"), c.hudY)
                     .setDefaultValue(-28).setSaveConsumer(v -> c.hudY = v).build());
-
-            // ---------------- Totem ----------------
-            ConfigCategory totem = b.getOrCreateCategory(Component.literal("Totem"));
-            totem.addEntry(e.startBooleanToggle(Component.literal("Corner pop indicator"), c.totemPop)
+            display.addEntry(e.startBooleanToggle(Component.literal("Totem corner pop indicator"), c.totemPop)
                     .setDefaultValue(true).setSaveConsumer(v -> c.totemPop = v).build());
-            totem.addEntry(e.startBooleanToggle(Component.literal("Hide centre animation"), c.hideCenterTotem)
+            display.addEntry(e.startBooleanToggle(Component.literal("Hide totem centre animation"), c.hideCenterTotem)
                     .setDefaultValue(true).setSaveConsumer(v -> c.hideCenterTotem = v).build());
-            totem.addEntry(e.startEnumSelector(Component.literal("Corner"), TotemCorner.class, c.totemCorner)
+            display.addEntry(e.startEnumSelector(Component.literal("Totem corner"), TotemCorner.class, c.totemCorner)
                     .setDefaultValue(TotemCorner.TOP_RIGHT).setSaveConsumer(v -> c.totemCorner = v).build());
-            totem.addEntry(e.startIntSlider(Component.literal("Size %"), c.totemSizePct, 100, 300)
+            display.addEntry(e.startIntSlider(Component.literal("Totem size %"), c.totemSizePct, 100, 300)
                     .setDefaultValue(160).setSaveConsumer(v -> c.totemSizePct = v).build());
-            totem.addEntry(e.startBooleanToggle(Component.literal("Screen flash on pop"), c.totemFlash)
+            display.addEntry(e.startBooleanToggle(Component.literal("Totem screen flash on pop"), c.totemFlash)
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("A brief full-screen red flash the instant your totem pops."))
                     .setSaveConsumer(v -> c.totemFlash = v).build());
@@ -64,6 +66,12 @@ public class PvpKitModMenu implements ModMenuApi {
             ConfigCategory clean = b.getOrCreateCategory(Component.literal("Clean View"));
             clean.addEntry(e.startBooleanToggle(Component.literal("No slowness FOV zoom (keeps speed/sprint)"), c.noSlownessFov)
                     .setDefaultValue(true).setSaveConsumer(v -> c.noSlownessFov = v).build());
+            clean.addEntry(e.startBooleanToggle(Component.literal("No Speed FOV zoom (keeps the actual speed boost)"), c.noSpeedFov)
+                    .setDefaultValue(true)
+                    .setTooltip(Component.literal(
+                            "Cancels the FOV zoom-out the Speed effect causes -- your movement speed is unchanged, "
+                            + "only the screen distortion is removed. Same technique as No slowness FOV zoom above."))
+                    .setSaveConsumer(v -> c.noSpeedFov = v).build());
             clean.addEntry(e.startBooleanToggle(Component.literal("No nausea / portal warp"), c.noNausea)
                     .setDefaultValue(true).setSaveConsumer(v -> c.noNausea = v).build());
             clean.addEntry(e.startBooleanToggle(Component.literal("No hurt tilt"), c.noHurtTilt)
@@ -75,7 +83,7 @@ public class PvpKitModMenu implements ModMenuApi {
             clean.addEntry(e.startBooleanToggle(Component.literal("Fullbright (night vision, shader-safe)"), c.fullbright)
                     .setDefaultValue(true).setSaveConsumer(v -> c.fullbright = v).build());
 
-            // ---------------- Combat ----------------
+            // ---------------- Combat (Combat + Utility) ----------------
             ConfigCategory combat = b.getOrCreateCategory(Component.literal("Combat"));
             combat.addEntry(e.startBooleanToggle(Component.literal("Crystal-only explosion removal"), c.noCrystalExplosion)
                     .setDefaultValue(true).setSaveConsumer(v -> c.noCrystalExplosion = v).build());
@@ -103,38 +111,16 @@ public class PvpKitModMenu implements ModMenuApi {
                     .setDefaultValue(true)
                     .setTooltip(Component.literal("The crosshair flashes green every time you switch hotbar slots -- same mechanism as the red cooldown flash above."))
                     .setSaveConsumer(v -> c.hotbarSwapFlash = v).build());
-
-            // ---------------- Locator ----------------
-            // Points a fancy corner arrow at ONE named player. Intended for a friend/
-            // teammate you want to find, not an opponent -- see PvpKitClient javadoc.
-            ConfigCategory locator = b.getOrCreateCategory(Component.literal("Locator"));
-            // Points to your nearest other player. Intended for private LAN play
-            // with friends, not public servers -- see PvpKitClient javadoc.
-            locator.addEntry(e.startBooleanToggle(Component.literal("Enable Locator Arrow"), c.locatorEnabled)
-                    .setDefaultValue(false).setSaveConsumer(v -> c.locatorEnabled = v).build());
-            locator.addEntry(e.startBooleanToggle(Component.literal("Disable in Spectator (best-effort lobby check)"), c.locatorDisableInSpectator)
-                    .setDefaultValue(true).setSaveConsumer(v -> c.locatorDisableInSpectator = v).build());
-            locator.addEntry(e.startBooleanToggle(Component.literal("Show target through walls (glow outline)"), c.locatorShowThroughWalls)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.literal("Uses vanilla's glow outline (same as Spectator highlight), visible through walls while the target is hidden."))
-                    .setSaveConsumer(v -> c.locatorShowThroughWalls = v).build());
-
-            // ---------------- Utility ----------------
-            ConfigCategory utility = b.getOrCreateCategory(Component.literal("Utility"));
-            utility.addEntry(e.startBooleanToggle(Component.literal("Auto Totem"), c.autoTotem)
+            combat.addEntry(e.startBooleanToggle(Component.literal("Auto Totem"), c.autoTotem)
                     .setDefaultValue(false)
                     .setTooltip(Component.literal("Keeps a totem in your offhand whenever one is elsewhere in your inventory."))
                     .setSaveConsumer(v -> c.autoTotem = v).build());
-            utility.addEntry(e.startBooleanToggle(Component.literal("Auto Eat"), c.autoEat)
+            combat.addEntry(e.startBooleanToggle(Component.literal("Auto Eat"), c.autoEat)
                     .setDefaultValue(false)
                     .setTooltip(Component.literal("Switches to hotbar food and eats it once hunger drops below the threshold below."))
                     .setSaveConsumer(v -> c.autoEat = v).build());
-            utility.addEntry(e.startIntSlider(Component.literal("Auto Eat hunger threshold"), c.autoEatHungerThreshold, 0, 19)
+            combat.addEntry(e.startIntSlider(Component.literal("Auto Eat hunger threshold"), c.autoEatHungerThreshold, 0, 19)
                     .setDefaultValue(14).setSaveConsumer(v -> c.autoEatHungerThreshold = v).build());
-            utility.addEntry(e.startBooleanToggle(Component.literal("Criticals (auto bunny-hop)"), c.criticals)
-                    .setDefaultValue(false)
-                    .setTooltip(Component.literal("Keeps you hopping while on the ground so every hit lands while airborne -- the same legal timing good PvP players already use, just automated."))
-                    .setSaveConsumer(v -> c.criticals = v).build());
 
             // ---------------- Xray ----------------
             // Full block transparency: non-whitelisted solid terrain becomes invisible

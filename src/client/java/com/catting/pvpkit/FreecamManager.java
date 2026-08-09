@@ -22,9 +22,9 @@ import net.minecraft.world.phys.Vec3;
  * and self-correcting if anything does nudge them.
  *
  * FAIR USE: this is a see-through-walls tool -- it can show you players and
- * terrain your body has no line of sight to. Same category (and same
- * private-world / LAN-with-friends framing) as the Locator arrow, NOT
- * something to take onto a server you don't host. See README's Fair use.
+ * terrain your body has no line of sight to. Private-world / LAN-with-friends
+ * territory, NOT something to take onto a server you don't host. See
+ * README's Fair use.
  */
 public final class FreecamManager {
 

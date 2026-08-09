@@ -38,22 +38,22 @@ The finished jar lands in `build/libs/` — take the one **without** the `-sourc
 
 ## Features
 
-Configured entirely from **Mod Menu → .PVP KIT**, across eight pages:
+Configured entirely from **Mod Menu → .PVP KIT**, across six pages:
 
-### HUD
+### Display
 FPS, CPS, and Ping — all rainbow-cycling text, positioned bottom-left to stay clear of
-minimap overlays like Xaero's.
-
-### Totem
-The actual totem-of-undying sprite pops in a screen corner the moment *you* pop a totem —
-a small echo of the vanilla animation (scale-in, spin, shrink-out, plus a little gold/green
-spark burst) instead of the big centre-screen one, which can optionally stay hidden. Corner
-and size are configurable. A brief full-screen red flash fires at the same instant (its own
-toggle, on by default).
+minimap overlays like Xaero's. Also the totem corner pop: the actual totem-of-undying
+sprite pops in a screen corner the moment *you* pop a totem — a small echo of the vanilla
+animation (scale-in, spin, shrink-out, plus a little gold/green spark burst) instead of
+the big centre-screen one, which can optionally stay hidden. Corner and size are
+configurable. A brief full-screen red flash fires at the same instant (its own toggle, on
+by default).
 
 ### Clean View
 - No slowness FOV zoom — while keeping speed/sprint/bow-draw zoom intact, scaled to the
   Slowness level rather than just clamped.
+- No Speed FOV zoom — cancels the FOV zoom-out from the Speed effect the same way,
+  while keeping the actual speed boost itself completely intact.
 - No nausea / nether-portal screen warp.
 - No hurt-camera tilt.
 - No blindness / darkness fog.
@@ -69,14 +69,18 @@ toggle, on by default).
   from the cooldown flash.
 - **Hotbar swap crosshair flash** — the crosshair flashes green every time you switch
   hotbar slots, using the same flash mechanism as the (red) cooldown-ready flash above.
+- **Auto Totem** — keeps a totem in your offhand any time one exists elsewhere in your
+  inventory.
+- **Auto Eat** — switches to hotbar food and eats once hunger drops below a configurable
+  threshold.
 
 ### Scroll wheel
 - **Disable scroll-wheel hotbar switching** — stops the wheel changing your hotbar slot,
   freeing it for something else. GUI/inventory/chat scrolling is unaffected.
 - **Scroll UP / DOWN action** — pick what each wheel direction does, so the wheel works
-  like a keybind: hotbar next/previous, or toggle Fullbright, Freecam, Locator, HUD,
-  Module HUD, Auto Totem, Auto Eat, Criticals, Kill Aura, Flight, No Damage, or Xray.
-  Only fires while you're actually playing, not in menus or chat.
+  like a keybind: hotbar next/previous, or toggle Fullbright, Freecam, HUD, Module HUD,
+  Auto Totem, Auto Eat, Kill Aura, Flight, No Damage, or Xray. Only fires
+  while you're actually playing, not in menus or chat.
 
   These are config dropdowns rather than real bindable keys because Minecraft's Key Binds
   screen can't capture a scroll event at all — see [DEVELOPMENT.md](DEVELOPMENT.md).
@@ -85,22 +89,14 @@ toggle, on by default).
 Detaches the view from your body so you can fly the camera around freely while your
 player stands frozen in place. WASD to move, space/shift for up/down, sprint to go
 faster; mouse look works as normal. Unbound by default — set **Toggle Freecam** under
-Options → Controls → Key Binds → PvP Kit. Since it sees through walls, it's in the
-same private-world/LAN category as the Locator — see [Fair use](#fair-use).
+Options → Controls → Key Binds → PvP Kit. Since it sees through walls, it's
+private-world/LAN territory — see [Fair use](#fair-use).
 
-### Locator
-A fancy arrow slides along the screen edge, pointing toward your nearest other player,
-with a live distance readout. Hides automatically once you have genuine line of sight
-(a real raycast, not just a facing check) or they're within your rough FOV. Off by
-default. See [Fair use](#fair-use).
-
-### Utility
-| Toggle | Effect |
-|---|---|
-| **Auto Totem** | Keeps a totem in your offhand any time one exists elsewhere in your inventory |
-| **Auto Eat** | Switches to hotbar food and eats once hunger drops below a configurable threshold |
-| **Criticals** | Keeps you hopping while on the ground so every hit lands while airborne — automates the same legal bunny-hop timing good PvP players already use manually, doesn't fake anything server-side |
-| **Module HUD** | Opens a clickable list of every module in the mod, top-right corner — click one to toggle it on/off right there, no need to dig into Mod Menu. Doesn't pause the game. Bound to **Right Shift** by default (every other keybind in this mod starts unbound — this one's the deliberate exception) |
+### Module HUD
+Opens a clickable list of every module in the mod, top-right corner — click one to
+toggle it on/off right there, no need to dig into Mod Menu. Doesn't pause the game.
+Bound to **Right Shift** by default (every other keybind in this mod starts unbound —
+this one's the deliberate exception).
 
 ### Xray
 Makes ordinary terrain (stone, dirt, deepslate, netherrack, and so on) fully invisible
@@ -130,22 +126,27 @@ Independent sandbox toggles, plus the original three-way cooldown-removal mode:
 
 ## Commands
 
-- **`/practicebot`** — summons a full-netherite (Protection IV, Unbreaking III, Mending),
-  unkillable combat dummy standing exactly where you are, wearing your own name and skin.
+- **`/practicebot`** — summons a full-netherite (Protection IV, Unbreaking III, Mending)
+  combat dummy standing exactly where you are, wearing your own name and skin. It fights
+  like a real player: real damage, real knockback, real hit reactions — it just never dies,
+  because it carries an endless supply of totems (see below).
 - **`/practicebot remove`** — despawns it.
 
 Combat modes (each re-summons the bot in that mode, swapping to the right gear):
 
 | Command | Behaviour |
 |---|---|
-| **`/practicebot shield`** | Stands still holding its shield up |
-| **`/practicebot sword`** | Chases you and swings a netherite sword on a ~0.6s rhythm |
-| **`/practicebot axe`** | Same, with a netherite axe on the slower ~1s axe rhythm |
-| **`/practicebot mace`** | Closes in, launches straight up, then dives onto you with a mace — deliberately **75% accurate**, so it misses sometimes |
-| **`/practicebot elytra mace`** | Mace dive, but higher and floatier, wearing an elytra instead of a chestplate |
-| **`/practicebot firework mace`** | Mace dive with a much faster, snappier rocket-boosted arc |
+| **`/practicebot shield`** | Stands still holding its shield up. Disable the shield with an axe and it drops its guard for the real cooldown, exactly like a player |
 | **`/practicebot defend`** | Backs away from you, and backs off harder when you're airborne or holding a mace |
-| **`/practicebot crystal`** | Places obsidian beside you, puts an end crystal on it, then detonates it |
+| **`/practicebot unmoveable`** | Locked to the spot: nothing can shift it -- not knockback, explosions, water or pistons. Still takes real damage, hit reactions and totem pops |
+
+**Endless totems, not god mode.** The bot holds a Totem of Undying in its offhand which is
+restocked every tick. Each death is a genuine vanilla totem activation — the pop animation
+plays, it drops to half a heart, and vanilla's own post-totem Regeneration and Absorption
+kick in — so you get to practise actually bursting through a totem. It deliberately carries
+no Resistance or Regeneration effects, since those suppress damage and knockback and make
+hits feel like they aren't landing. Its armour's knockback resistance is also cancelled, so
+every clean hit sends it flying instead of barely nudging it.
 
 Whatever mode it was in is remembered across world rejoins along with its position.
 
@@ -167,12 +168,12 @@ This mod's design draws a hard line between two categories:
   only reflects information already visible on your own screen (your own hits, your own
   cooldowns, nearby players' positions when you can see them anyway). This is fine on
   essentially any server; check individual server rules if in doubt.
-- **The No Cooldown page and the Locator arrow** are built for **private worlds and LAN
-  sessions with friends who know it's active** — same spirit as Bedrock Edition's cheat
-  toggles. Damage, durability, hunger, and flight are server-authoritative, so these do
-  nothing meaningful on a server you don't host, and using them against people who
-  haven't agreed to it is exactly what anti-cheat systems exist to catch. Use this page
-  in your own worlds, not on a competitive server.
+- **The No Cooldown page** is built for **private worlds and LAN sessions with friends
+  who know it's active** — same spirit as Bedrock Edition's cheat toggles. Damage,
+  durability, hunger, and flight are server-authoritative, so these do nothing
+  meaningful on a server you don't host, and using them against people who haven't
+  agreed to it is exactly what anti-cheat systems exist to catch. Use this page in your
+  own worlds, not on a competitive server.
 - **Kill Aura deserves an extra-bold warning**: attacking is client-initiated, so unlike
   the rest of the No Cooldown page it **does** work on servers you don't host. Using it
   against people who haven't agreed to it is plain cheating and a fast ban on any
@@ -195,10 +196,10 @@ slots, Attack, anything)? Install **Multi Key Bindings** (by kennybc) alongside 
 — it adds a "+" to every row in the Key Binds screen for exactly that, so there's no
 need for this mod to duplicate it.
 
-**PVP**: toggle Fullbright, Locator Arrow, Hit Marker, Cooldown Flash, Crystal-Only
-Explosion Removal, Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Criticals,
-Xray, and **Module HUD** (Right Shift — opens the clickable module list rather than a
-plain toggle); plus **Screenshot** and **Start/Stop Recording** (captures to
+**PVP**: toggle Fullbright, Hit Marker, Cooldown Flash, Crystal-Only Explosion Removal,
+Totem Corner Pop, HUD, Clean View, Auto Totem, Auto Eat, Xray, and **Module
+HUD** (Right Shift — opens the clickable module list rather than a plain toggle); plus
+**Screenshot** and **Start/Stop Recording** (captures to
 `files/screenshots/` and `files/screen recording/<timestamp>/` as a PNG sequence — turn
 it into a video with `ffmpeg -framerate 10 -i frame_%06d.png -c:v libx264 -pix_fmt
 yuv420p out.mp4`, or use OBS Studio for real-time recording).
