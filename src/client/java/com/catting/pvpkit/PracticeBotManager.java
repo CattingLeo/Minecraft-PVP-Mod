@@ -135,6 +135,27 @@ public final class PracticeBotManager {
         return bot != null && bot == entity;
     }
 
+    /**
+     * Velocity the bot's absent client would have been told to apply by the last hit, waiting
+     * to be applied at the head of its next tick. See KnockbackReconciliationMixin.
+     *
+     * Server thread only (set during packet handling, read during the entity tick, both on
+     * that thread).
+     */
+    private static Vec3 pendingKnockback;
+
+    /** KnockbackReconciliationMixin hands over the velocity vanilla's motion packet carried. */
+    public static void recordKnockback(Vec3 velocity) {
+        pendingKnockback = velocity;
+    }
+
+    /** The pending hit velocity, or null. Consumed -- calling it twice returns null the second time. */
+    public static Vec3 consumeKnockback() {
+        Vec3 velocity = pendingKnockback;
+        pendingKnockback = null;
+        return velocity;
+    }
+
     /** A tick path threw for the bot; log once rather than killing the server tick loop. */
     public static void onTickError(Exception e) {
         if (tickErrorLogged) return;
@@ -390,6 +411,7 @@ public final class PracticeBotManager {
         }
         bot = newBot;
         mode = requested;
+        pendingKnockback = null; // a hit landed on the previous bot must not shove the new one
         PracticeBotAi.reset(); // don't carry velocity state across a mode switch
         onSuccess.run();
     }
@@ -409,6 +431,7 @@ public final class PracticeBotManager {
             }
             bot = null;
             mode = PracticeBotAi.Mode.IDLE;
+            pendingKnockback = null;
             PracticeBotAi.reset();
             PracticeBotState.get().active = false;
             PracticeBotState.save();

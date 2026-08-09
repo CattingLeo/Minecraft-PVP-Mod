@@ -28,8 +28,19 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * it, inside the same synchronous attack-handling call that set it -- before
  * FakePlayerTickMixin's tick() ever gets a chance to consume it into actual movement.
  *
- * Redirects the specific setDeltaMovement(Vec3) call vanilla uses for that reset and skips
- * it only when the target is our bot, leaving knockback()'s result in place.
+ * Rather than simply skipping that reset, this reproduces what the absent client would have
+ * done: it RECORDS the velocity the motion packet was built from (the post-knockback value)
+ * and still lets vanilla's reset run, then FakePlayerTickMixin applies the recorded value at
+ * the head of the bot's next tick -- i.e. "the client applies the last motion packet it
+ * received", which is exactly the real player's outcome.
+ *
+ * Recording rather than skipping matters because causeExtraKnockback is called TWICE per hit
+ * on some paths (Player#stabAttack, used by the KineticWeapon/PiercingWeapon item components),
+ * both times with the SAME oldMovement. Vanilla's reset is what gives the second call a clean
+ * baseline; skipping it outright made the second knockback stack on top of the first and sent
+ * the bot noticeably further than the same hit would send a real player. On the ordinary
+ * Player#attack path (a single call) recording and skipping produce an identical result, so
+ * this does not change the melee feel.
  */
 @Mixin(Player.class)
 public abstract class KnockbackReconciliationMixin {
@@ -38,7 +49,10 @@ public abstract class KnockbackReconciliationMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V"))
     private void pvpkit$keepBotKnockback(Entity instance, Vec3 resetTo) {
         if (PracticeBotManager.isPracticeBot(instance)) {
-            return;
+            // The value the ClientboundSetEntityMotionPacket was just built from -- vanilla
+            // constructs the packet immediately before this call, so the current velocity IS
+            // what a real client would have been told to apply.
+            PracticeBotManager.recordKnockback(instance.getDeltaMovement());
         }
         instance.setDeltaMovement(resetTo);
     }

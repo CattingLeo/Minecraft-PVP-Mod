@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -61,6 +62,15 @@ public abstract class FakePlayerTickMixin extends ServerPlayer {
             if (this.level().getServer().getTickCount() % 10 == 0) {
                 this.connection.resetPosition();
                 this.level().getChunkSource().move(this);
+            }
+
+            // Stands in for the client applying the motion packet vanilla sent for the last
+            // hit -- see KnockbackReconciliationMixin for why the velocity arrives this way
+            // instead of just being left in place. Applied BEFORE super.tick() so the hit is
+            // consumed into movement on the same tick a real player's would be.
+            Vec3 knockback = PracticeBotManager.consumeKnockback();
+            if (knockback != null) {
+                this.setDeltaMovement(knockback);
             }
 
             super.tick();
