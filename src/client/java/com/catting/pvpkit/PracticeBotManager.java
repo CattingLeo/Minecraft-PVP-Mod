@@ -159,6 +159,7 @@ public final class PracticeBotManager {
         // Runs on the server thread already (this event fires there), so no
         // server.execute() hop needed.
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            announceRestoreOncePlayerExists(server);
             if (bot == null || !bot.isAlive()) return;
             ServerLevel level = (ServerLevel) bot.level();
             PracticeBotAi.tick(bot, mode, level);
@@ -213,6 +214,40 @@ public final class PracticeBotManager {
         return 1;
     }
 
+    /**
+     * Mode restored at world load, waiting to be announced.
+     *
+     * The restore itself fires at SERVER_STARTED, which is BEFORE the client player exists,
+     * so a chat message sent from there goes nowhere. This holds it until someone is actually
+     * around to read it.
+     */
+    private static PracticeBotAi.Mode pendingRestoreNotice;
+
+    /**
+     * Tells you which mode the auto-restored bot came back in.
+     *
+     * Worth the noise: the restore used to be entirely silent, and a bot restored in
+     * `unmoveable` (immune to knockback and pinned in place BY DESIGN) is indistinguishable
+     * from a broken bot -- it reads as "my hits do nothing", which cost a real debugging
+     * session chasing a knockback bug that wasn't there.
+     */
+    private static void announceRestoreOncePlayerExists(MinecraftServer server) {
+        if (pendingRestoreNotice == null || server.getPlayerList().getPlayers().isEmpty()) return;
+        PracticeBotAi.Mode notice = pendingRestoreNotice;
+        pendingRestoreNotice = null;
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.player == null) return;
+            // LocalPlayer#sendSystemMessage, verified present via javap on this exact 26.2
+            // build -- NOT Player#displayClientMessage or Gui#getChat(), both of which are
+            // absent here (see PvpKitKeybinds#chat for the same trap).
+            mc.player.sendSystemMessage(Component.literal(
+                    "Practice bot restored -- mode: " + notice.label
+                    + (notice == PracticeBotAi.Mode.UNMOVEABLE ? " (immune to knockback by design)" : "")
+                    + ". Use /practicebot for a normal one."));
+        });
+    }
+
     /** Re-summons the bot on world load if one was active when you last quit -- see class javadoc. */
     private static void restoreOnServerStart(MinecraftServer server) {
         PracticeBotState state = PracticeBotState.get();
@@ -231,7 +266,7 @@ public final class PracticeBotManager {
         float yaw = state.yaw;
 
         server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, restored,
-                () -> { /* silent -- this runs automatically, not from a command the player typed */ },
+                () -> pendingRestoreNotice = restored,
                 error -> { /* nothing to report an error to here either */ }));
     }
 
@@ -306,32 +341,28 @@ public final class PracticeBotManager {
         newBot.setInvulnerable(false);
         newBot.setHealth(newBot.getMaxHealth());
 
-        // Cancels the knockback resistance a full netherite set grants (0.1 per piece = 0.4),
-        // so hits knock the bot back like they would an unarmoured player. It keeps
-        // netherite's damage reduction -- only the knockback immunity goes.
+        // Knockback resistance is left at whatever the armour naturally grants -- for the full
+        // netherite set that's 0.4 (0.1 per piece, verified in ArmorMaterials.NETHERITE's
+        // bytecode), exactly what a real player in the same kit has.
         //
-        // MUST be ADD_MULTIPLIED_TOTAL, not ADD_VALUE. An earlier attempt used
-        // ADD_VALUE(-1.0) assuming the RangedAttribute would clamp the result to its [0,1]
-        // range; it does NOT -- diagnostics showed the live value sitting at -1.00. Vanilla
-        // then computes `strength *= 1.0 - resistance`, i.e. `strength *= 2.0`, so that
-        // "fix" DOUBLED every knockback instead of removing the resistance, which is what
-        // was launching the bot across the field. ADD_MULTIPLIED_TOTAL(-1.0) scales the
-        // total by (1 + -1) = exactly 0 and cannot go negative no matter what is worn.
+        // Earlier builds force-cancelled it to 0 so the bot "flew like an unarmoured player".
+        // That was compensation for knockback appearing not to work AT ALL, and the real cause
+        // of that has since been found and fixed properly (see KnockbackReconciliationMixin:
+        // vanilla was resetting the bot's velocity straight back to its pre-hit value because
+        // it assumes a ServerPlayer target has a real client to simulate the motion instead).
+        // With genuine knockback restored, the old cancel stacked on top and sent the bot
+        // flying ~1.67x too far -- vanilla computes `strength *= 1.0 - resistance`, so 0.0
+        // resistance takes 100% of the hit where a real netherite player takes 60%.
         AttributeInstance kbResist = newBot.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
         if (kbResist != null) {
-            kbResist.removeModifier(NO_KNOCKBACK_RESISTANCE); // re-summon reuses a CACHED FakePlayer
-            // Cancels the armour's knockback resistance so hits land like they would on an
-            // unarmoured player. ADD_MULTIPLIED_TOTAL(-1.0) scales the total to exactly 0;
-            // it must NOT be ADD_VALUE(-1.0), which leaves it at -1.0 and DOUBLES knockback
-            // (vanilla computes `strength *= 1.0 - resistance`).
+            // Always strip first: FakePlayer.get() hands back a CACHED instance, so a bot
+            // summoned by an older build still carries that build's modifier.
+            kbResist.removeModifier(NO_KNOCKBACK_RESISTANCE);
             if (requested == PracticeBotAi.Mode.UNMOVEABLE) {
                 // Full immunity: vanilla computes `strength *= 1.0 - resistance`, so a resistance
                 // of >= 1 makes strength <= 0 and knockback() returns before touching velocity.
                 kbResist.addPermanentModifier(new AttributeModifier(
                         NO_KNOCKBACK_RESISTANCE, 1.0, AttributeModifier.Operation.ADD_VALUE));
-            } else {
-                kbResist.addPermanentModifier(new AttributeModifier(
-                        NO_KNOCKBACK_RESISTANCE, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
             }
         }
         newBot.setCustomName(Component.literal(real.name() + "'s Practice Bot"));

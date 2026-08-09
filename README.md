@@ -145,10 +145,13 @@ restocked every tick. Each death is a genuine vanilla totem activation — the p
 plays, it drops to half a heart, and vanilla's own post-totem Regeneration and Absorption
 kick in — so you get to practise actually bursting through a totem. It deliberately carries
 no Resistance or Regeneration effects, since those suppress damage and knockback and make
-hits feel like they aren't landing. Its armour's knockback resistance is also cancelled, so
-every clean hit sends it flying instead of barely nudging it.
+hits feel like they aren't landing. Its knockback resistance is left exactly as the full
+netherite set grants it (0.4), so a hit moves it the same distance it would move a real
+player wearing the same kit — no more, no less.
 
-Whatever mode it was in is remembered across world rejoins along with its position.
+Whatever mode it was in is remembered across world rejoins along with its position, and it
+now tells you which mode it came back in. That matters most for `unmoveable`: a bot restored
+in that mode ignores knockback *by design*, which is easy to mistake for a broken bot.
 
 **Singleplayer / world-host only.** Spawning a real, hittable entity needs server
 authority, and this mod is client-side only — it only has that authority when you're
