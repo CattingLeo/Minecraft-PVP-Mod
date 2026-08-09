@@ -113,6 +113,20 @@ public final class PracticeBotManager {
     private static FakePlayer bot;
     private static PracticeBotAi.Mode mode = PracticeBotAi.Mode.IDLE;
 
+    /**
+     * UUID of the FakePlayer profile actually in use. Starts at BOT_UUID; performSummon
+     * bumps it (see botUuid) whenever the cached instance under the current UUID turns out
+     * to be a dead one -- see the isRemoved() check there for why that happens.
+     */
+    private static UUID currentBotUuid = BOT_UUID;
+    private static int generation;
+
+    /** Gen 0 is the stable BOT_UUID (keeps the common case deterministic); later gens are derived so each is a fresh cache key. */
+    private static UUID botUuid(int gen) {
+        return gen == 0 ? BOT_UUID
+                : UUID.nameUUIDFromBytes(("pvpkit:practicebot:" + gen).getBytes(StandardCharsets.UTF_8));
+    }
+
     private PracticeBotManager() {
     }
 
@@ -130,23 +144,6 @@ public final class PracticeBotManager {
 
     private static boolean tickErrorLogged;
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("pvpkit");
-
-    // ---- TEMPORARY DIAGNOSTICS: proves FakePlayerTickMixin is actually running ----
-    private static int realTickCount;
-
-    /** Called from FakePlayerTickMixin each time the REAL player tick runs for our bot. */
-    public static void countRealTick() {
-        realTickCount++;
-    }
-
-    public static int tickCount() {
-        return realTickCount;
-    }
-
-    /** TEMPORARY: KnockbackProbeMixin routes vanilla knockback() calls here. */
-    public static void logKnockback(String msg) {
-        LOGGER.info("[practicebot] {}", msg);
-    }
 
     public static void init() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
@@ -248,9 +245,24 @@ public final class PracticeBotManager {
             return;
         }
 
-        GameProfile fake = new GameProfile(BOT_UUID, real.name(), new PropertyMap(real.properties()));
+        GameProfile fake = new GameProfile(currentBotUuid, real.name(), new PropertyMap(real.properties()));
         FakePlayer newBot = FakePlayer.get(level, fake);
-        boolean alreadyTracked = level.getEntity(BOT_UUID) != null;
+        if (newBot.isRemoved()) {
+            // Fabric API's FakePlayer.get() caches instances forever in a weakValues map
+            // keyed by (level, profile) as long as something -- our own `bot` field -- holds
+            // a strong reference. /practicebot remove (or the bot dying for real) discards
+            // the entity, permanently setting its removed flag; there is no vanilla way to
+            // undo that. The NEXT summon's get() call was handing back that same dead
+            // instance, and vanilla refuses to re-add an already-removed entity ("Tried to
+            // add entity minecraft:player but it was marked as removed already", confirmed
+            // in a real play session's log every time this path was hit) -- so the bot
+            // silently never reappeared. A new UUID is a new cache key, forcing get() to
+            // construct a genuinely new FakePlayer instead.
+            currentBotUuid = botUuid(++generation);
+            fake = new GameProfile(currentBotUuid, real.name(), new PropertyMap(real.properties()));
+            newBot = FakePlayer.get(level, fake);
+        }
+        boolean alreadyTracked = level.getEntity(currentBotUuid) != null;
 
         RegistryAccess registries = level.registryAccess();
         newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));

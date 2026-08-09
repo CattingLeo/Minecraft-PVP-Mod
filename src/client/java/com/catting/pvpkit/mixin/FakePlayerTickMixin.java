@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.Vec3;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -52,8 +51,6 @@ public abstract class FakePlayerTickMixin extends ServerPlayer {
     private void pvpkit$runTheRealPlayerTick(CallbackInfo ci) {
         if (!PracticeBotManager.isPracticeBot((FakePlayer) (Object) this)) return;
         try {
-            PracticeBotManager.countRealTick(); // TEMPORARY: proves this mixin actually runs
-
             // THE missing half of Carpet's tick, and the reason knockback appeared to do
             // nothing at all. A fake player never sends movement packets, so the connection's
             // "last good position" never advances -- and the server's position-correction
@@ -66,18 +63,8 @@ public abstract class FakePlayerTickMixin extends ServerPlayer {
                 this.level().getChunkSource().move(this);
             }
 
-            // TEMPORARY: knockback demonstrably lands in deltaMovement, then is gone (and the
-            // bot hasn't moved) by END_SERVER_TICK. Logging either side of the real tick shows
-            // whether the tick consumes it into movement, or wipes it without moving.
-            Vec3 before = this.getDeltaMovement();
             super.tick();
             this.doTick();
-            Vec3 after = this.getDeltaMovement();
-            if (before.horizontalDistanceSqr() > 1.0E-6 || after.horizontalDistanceSqr() > 1.0E-6) {
-                PracticeBotManager.logKnockback(String.format(
-                        "TICK dmIn=(%.3f, %.3f, %.3f) dmOut=(%.3f, %.3f, %.3f) onGround=%s",
-                        before.x, before.y, before.z, after.x, after.y, after.z, this.onGround()));
-            }
         } catch (Exception e) {
             // A fake player has no genuine connection behind it, so a stray tick path can
             // still throw. Carpet swallows the same way (its tick() has a catch around this

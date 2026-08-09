@@ -86,8 +86,6 @@ public final class PracticeBotAi {
                 : 0.0f;
 
         if (mode == Mode.UNMOVEABLE) pinInPlace(bot);
-
-        diagnose(bot);
     }
 
     /**
@@ -111,40 +109,6 @@ public final class PracticeBotAi {
         bot.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         bot.setPos(lockPos.x, lockPos.y, lockPos.z);
         bot.setOnGround(true); // otherwise it reads as perpetually falling and plays fall animations
-    }
-
-    // ---- TEMPORARY DIAGNOSTICS (delete once knockback is confirmed) ----
-    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("pvpkit-bot");
-    private static int prevHurtTime;
-    private static int traceTicks;
-    private static net.minecraft.world.phys.Vec3 lastPos;
-
-    /** Logs the bot's real state for a few ticks after each hit, so knockback is diagnosed from numbers, not guesses. */
-    private static void diagnose(FakePlayer bot) {
-        net.minecraft.world.phys.Vec3 pos = bot.position();
-        net.minecraft.world.phys.Vec3 moved = lastPos == null ? net.minecraft.world.phys.Vec3.ZERO : pos.subtract(lastPos);
-        lastPos = pos;
-
-        if (bot.hurtTime > prevHurtTime) {
-            traceTicks = 12;
-            LOG.info("[practicebot] HIT kbRes={} realTicks={} dm={} onGround={} pose={} fallFlying={} iframes={} blocking={}",
-                    String.format("%.2f", bot.getAttributeValue(
-                            net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE)),
-                    PracticeBotManager.tickCount(), fmt(bot.getDeltaMovement()), bot.onGround(),
-                    bot.getPose(), bot.isFallFlying(), bot.invulnerableTime, bot.isBlocking());
-        }
-        prevHurtTime = bot.hurtTime;
-
-        if (traceTicks > 0) {
-            LOG.info("[practicebot]  t{} dm={} moved={} ({} blocks) onGround={}",
-                    12 - traceTicks, fmt(bot.getDeltaMovement()), fmt(moved),
-                    String.format("%.3f", moved.length()), bot.onGround());
-            traceTicks--;
-        }
-    }
-
-    private static String fmt(net.minecraft.world.phys.Vec3 v) {
-        return String.format("(%.3f, %.3f, %.3f)", v.x, v.y, v.z);
     }
 
     /** Backs off, and backs off sooner when the player is winding up something big (airborne / mace out). */
