@@ -93,10 +93,20 @@ Options → Controls → Key Binds → PvP Kit. Since it sees through walls, it'
 private-world/LAN territory — see [Fair use](#fair-use).
 
 ### Module HUD
-Opens a clickable list of every module in the mod, top-right corner — click one to
-toggle it on/off right there, no need to dig into Mod Menu. Doesn't pause the game.
-Bound to **Right Shift** by default (every other keybind in this mod starts unbound —
-this one's the deliberate exception).
+A client-style module panel in the top-right corner — click a module to toggle it right
+there, no need to dig into Mod Menu. Doesn't pause the game. Bound to **Right Shift** by
+default (every other keybind in this mod starts unbound — this one's the deliberate
+exception).
+
+Modules are grouped into collapsible **Combat / Render / Player / Movement / Misc**
+sections with a **search box** at the top: type `tot` and you get Auto Totem, Totem Pop
+Counter and Totem Flash regardless of which sections are open. The title bar shows how
+many modules are enabled out of the total, so the panel is worth a glance even fully
+collapsed. Your search text and which sections are open survive closing and reopening it.
+
+Sub-settings deliberately stay in Mod Menu → .PVP KIT — the sliders, HUD position,
+per-ore Xray checkboxes and enum pickers belong on the screen built for them. What the
+panel lists is the set of things you'd flip mid-game.
 
 ### Xray
 Makes ordinary terrain (stone, dirt, deepslate, netherrack, and so on) fully invisible
