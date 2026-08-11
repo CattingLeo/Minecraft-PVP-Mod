@@ -8,6 +8,12 @@ is configured in-game via **Mod Menu** — no config-file editing required.
 > on a public server — read the [Fair use](#fair-use) section before you fly, no-clip,
 > or godmode your way onto someone else's server.
 
+> **26.2.5-alpha.** This release carries a large batch of unverified work: the reworked
+> module HUD, the practice bot's health tag and armour selection, the starvation and
+> shield-knockback fixes, and the whole `/arena` command. It compiles and the APIs are
+> checked against 26.2, but none of it has been played yet. Expect rough edges, and use
+> the last stable tag (`v26.2.4`) if you want something proven.
+
 ## Requirements
 
 - Minecraft **26.2**
@@ -136,11 +142,41 @@ Independent sandbox toggles, plus the original three-way cooldown-removal mode:
 
 ## Commands
 
-- **`/practicebot`** — summons a full-netherite (Protection IV, Unbreaking III, Mending)
-  combat dummy standing exactly where you are, wearing your own name and skin. It fights
-  like a real player: real damage, real knockback, real hit reactions — it just never dies,
-  because it carries an endless supply of totems (see below).
+- **`/practicebot idle`** — summons a full-netherite (Protection IV, and genuinely
+  *unbreakable*) combat dummy standing exactly where you are, wearing your own name and skin.
+  It fights like a real player: real damage, real knockback, real hit reactions — it just
+  never dies, because it carries an endless supply of totems (see below). Its name tag shows
+  live health, colour-coded green → yellow → red, with any absorption from a totem pop in gold.
 - **`/practicebot remove`** — despawns it.
+
+A mode is always required — bare `/practicebot` isn't a command, so the first thing it
+suggests is the list of modes.
+
+Its armour's protection enchant is selectable, so you can practise against the kit that
+actually matters — add one of these after the command (or after a mode):
+
+| Argument | Armour |
+|---|---|
+| *(none)* | Protection IV — the default |
+| **`blast_protection`** | Blast Protection IV — for crystal and anchor trades |
+| **`projectile_protection`** | Projectile Protection IV — for bow and crossbow fights |
+| **`fire_protection`** | Fire Protection IV |
+| **`protection`** | Protection IV, stated explicitly |
+
+Armour goes **after a mode**, and every mode accepts every option — so `/practicebot idle
+blast_protection` is a crystal-resistant dummy that just stands there, and `/practicebot
+defend projectile_protection` is one that backs away wearing Projectile Protection. The
+arguments match the vanilla enchantment ids, and all four cap at IV, so the level never
+varies.
+
+Armour isn't offered directly off the root — that would put eight suggestions on the first
+level and bury the four that actually choose behaviour. Naming a mode first keeps the
+suggestion list to exactly the four behaviours, then exactly the four armours.
+
+Everything the bot wears and holds carries the **Unbreakable** flag — not merely Unbreaking
+III. Its kit takes damage every exchange and nothing ever repairs it (Mending needs XP orbs,
+which a fake player never picks up), so without this the armour would eventually break
+mid-session and quietly change what you're practising against.
 
 Combat modes (each re-summons the bot in that mode, swapping to the right gear):
 
@@ -155,13 +191,18 @@ restocked every tick. Each death is a genuine vanilla totem activation — the p
 plays, it drops to half a heart, and vanilla's own post-totem Regeneration and Absorption
 kick in — so you get to practise actually bursting through a totem. It deliberately carries
 no Resistance or Regeneration effects, since those suppress damage and knockback and make
-hits feel like they aren't landing. Its knockback resistance is left exactly as the full
+hits feel like they aren't landing. It doesn't starve either: it runs a real player tick, so
+it has real hunger that drains every time you hit it and no way to eat — left alone that
+ends in permanent starvation damage that looks like the bot taking damage out of nowhere.
+Its food is pinned just below the level where vanilla would start healing it, so it neither
+starves nor quietly regenerates. Its knockback resistance is left exactly as the full
 netherite set grants it (0.4), so a hit moves it the same distance it would move a real
 player wearing the same kit — no more, no less.
 
-Whatever mode it was in is remembered across world rejoins along with its position, and it
-now tells you which mode it came back in. That matters most for `unmoveable`: a bot restored
-in that mode ignores knockback *by design*, which is easy to mistake for a broken bot.
+Whatever mode and armour it was in is remembered across world rejoins along with its
+position, and it now tells you which mode it came back in. That matters most for
+`unmoveable`: a bot restored in that mode ignores knockback *by design*, which is easy to
+mistake for a broken bot.
 
 **Singleplayer / world-host only.** Spawning a real, hittable entity needs server
 authority, and this mod is client-side only — it only has that authority when you're

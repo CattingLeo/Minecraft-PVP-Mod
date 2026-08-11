@@ -249,6 +249,7 @@ public class PvpKitClient implements ClientModInitializer {
         applyConfig();
         PvpKitKeybinds.register();
         PracticeBotManager.init();
+        ArenaManager.init();
         FreecamManager.init();
         ScrollKeybind.init();
         MultiBindManager.init();

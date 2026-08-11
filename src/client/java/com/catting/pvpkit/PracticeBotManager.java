@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -21,12 +22,16 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.Mth;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Unit;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -156,6 +161,109 @@ public final class PracticeBotManager {
         return velocity;
     }
 
+    /**
+     * Which protection enchant the bot's netherite set carries, so you can practise against the
+     * kit that actually matters: Blast Protection for crystal/anchor trades, Projectile
+     * Protection for bow and crossbow fights, and so on.
+     *
+     * All four cap at IV in vanilla, so the level doesn't vary per type.
+     */
+    public enum Protection {
+        PROTECTION("protection", "Protection", Enchantments.PROTECTION),
+        BLAST("blast_protection", "Blast Protection", Enchantments.BLAST_PROTECTION),
+        PROJECTILE("projectile_protection", "Projectile Protection", Enchantments.PROJECTILE_PROTECTION),
+        FIRE("fire_protection", "Fire Protection", Enchantments.FIRE_PROTECTION);
+
+        /**
+         * Literal typed after the mode, e.g. "/practicebot defend blast_protection". Matches the
+         * vanilla enchantment id rather than a short alias, so it reads the same as it does
+         * everywhere else in the game.
+         *
+         * Kept separate from name(): that's what gets written to practicebot.json, so renaming
+         * what you type here never invalidates a saved bot.
+         */
+        public final String command;
+        public final String label;
+        public final ResourceKey<Enchantment> enchantment;
+
+        Protection(String command, String label, ResourceKey<Enchantment> enchantment) {
+            this.command = command;
+            this.label = label;
+            this.enchantment = enchantment;
+        }
+    }
+
+    /** "<mode>", plus a "<mode> <protection>" child per armour choice. */
+    private static LiteralArgumentBuilder<FabricClientCommandSource> modeNode(PracticeBotAi.Mode mode) {
+        var node = ClientCommands.literal(mode.label)
+                .executes(ctx -> summon(ctx.getSource(), mode, Protection.PROTECTION));
+        for (Protection protection : Protection.values()) {
+            node = node.then(ClientCommands.literal(protection.command)
+                    .executes(ctx -> summon(ctx.getSource(), mode, protection)));
+        }
+        return node;
+    }
+
+    /** Name tag without the health suffix, captured at summon. */
+    private static String baseName = "Practice Bot";
+    private static int shownHealth = Integer.MIN_VALUE;
+    private static int shownAbsorption = Integer.MIN_VALUE;
+
+    /**
+     * Health readout above the bot, the way a PvP server shows it under a player's name.
+     *
+     * Done as the custom NAME rather than a rendered bar: the name tag is already synced to
+     * every client that can see the entity, so this works for anyone on your LAN world with no
+     * client-side render mixin and nothing for Sodium to conflict with.
+     *
+     * Only rebuilt when the DISPLAYED numbers change, not every tick -- setCustomName writes to
+     * synched entity data, so a per-tick rebuild would be a packet every tick for a value that
+     * changes a few times per fight.
+     */
+    public static void refreshHealthTag(FakePlayer target) {
+        int health = Mth.ceil(target.getHealth());
+        int absorption = Mth.ceil(target.getAbsorptionAmount());
+        if (health == shownHealth && absorption == shownAbsorption) return;
+        shownHealth = health;
+        shownAbsorption = absorption;
+
+        float max = target.getMaxHealth();
+        float fraction = max <= 0.0f ? 0.0f : health / max;
+        ChatFormatting colour = fraction > 0.6f ? ChatFormatting.GREEN
+                : fraction > 0.3f ? ChatFormatting.YELLOW
+                : ChatFormatting.RED;
+
+        MutableComponent name = Component.literal(baseName + " ").withStyle(ChatFormatting.WHITE);
+        name.append(Component.literal(String.valueOf(health)).withStyle(colour));
+        // Absorption is what a totem pop leaves behind, so it's worth showing separately rather
+        // than folded into the health number -- it's the shield you have to chew through again.
+        if (absorption > 0) {
+            name.append(Component.literal("+" + absorption).withStyle(ChatFormatting.GOLD));
+        }
+        // U+2764. Safe in the default font: its provider list falls back to
+        // minecraft:include/unifont (checked in assets/minecraft/font/default.json), which
+        // covers the whole BMP.
+        name.append(Component.literal("❤").withStyle(colour));
+        target.setCustomName(name);
+    }
+
+    /**
+     * Drops the bot into an arena pod for /arena start.
+     *
+     * Also updates the saved spawn position, so the round-reset respawn puts it back in its pod
+     * rather than wherever it was originally summoned across the world.
+     */
+    public static void moveToArena(net.minecraft.core.BlockPos pod) {
+        if (bot == null || !bot.isAlive()) return;
+        bot.teleportTo(pod.getX() + 0.5, pod.getY(), pod.getZ() + 0.5);
+
+        PracticeBotState state = PracticeBotState.get();
+        state.x = pod.getX() + 0.5;
+        state.y = pod.getY();
+        state.z = pod.getZ() + 0.5;
+        PracticeBotState.save();
+    }
+
     /** A tick path threw for the bot; log once rather than killing the server tick loop. */
     public static void onTickError(Exception e) {
         if (tickErrorLogged) return;
@@ -168,12 +276,17 @@ public final class PracticeBotManager {
 
     public static void init() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
+            // No .executes on the root on purpose: bare "/practicebot" is not a command, so a
+            // mode always has to be named. "/practicebot idle" is the old bare behaviour.
             var root = ClientCommands.literal("practicebot")
-                    .executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.IDLE))
                     .then(ClientCommands.literal("remove").executes(PracticeBotManager::remove));
-            root = root.then(ClientCommands.literal("shield").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.SHIELD)));
-            root = root.then(ClientCommands.literal("defend").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.DEFEND)));
-            root = root.then(ClientCommands.literal("unmoveable").executes(ctx -> summon(ctx.getSource(), PracticeBotAi.Mode.UNMOVEABLE)));
+            // Armour hangs off the MODES only -- never off the root. Offering
+            // "/practicebot blast_protection" as well would put eight suggestions on the first
+            // level and bury the four that actually pick behaviour. "/practicebot idle
+            // <armour>" covers the no-special-behaviour case instead.
+            for (PracticeBotAi.Mode mode : PracticeBotAi.Mode.values()) {
+                root = root.then(modeNode(mode));
+            }
             dispatcher.register(root);
         });
 
@@ -198,7 +311,7 @@ public final class PracticeBotManager {
         ServerLifecycleEvents.SERVER_STARTED.register(PracticeBotManager::restoreOnServerStart);
     }
 
-    private static int summon(FabricClientCommandSource source, PracticeBotAi.Mode requested) {
+    private static int summon(FabricClientCommandSource source, PracticeBotAi.Mode requested, Protection protection) {
         Minecraft mc = source.getClient();
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null) {
@@ -214,15 +327,15 @@ public final class PracticeBotManager {
         GameProfile real = mc.getGameProfile();
         Vec3 spawnPos = player.position();
         float yaw = player.getYRot() + 180.0f;
-        Component doneMessage = Component.literal(requested == PracticeBotAi.Mode.IDLE
-                ? "Practice bot summoned."
-                : "Practice bot summoned -- mode: " + requested.label + ".");
+        Component doneMessage = Component.literal("Practice bot summoned -- mode: " + requested.label
+                + ", armour: " + protection.label + " IV.");
 
-        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, requested,
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, requested, protection,
                 () -> {
                     PracticeBotState state = PracticeBotState.get();
                     state.active = true;
                     state.mode = requested.name();
+                    state.protection = protection.name();
                     state.dimension = dimension.identifier().toString();
                     state.x = spawnPos.x;
                     state.y = spawnPos.y;
@@ -284,16 +397,24 @@ public final class PracticeBotManager {
             saved = PracticeBotAi.Mode.IDLE; // unknown/renamed mode in the json -- degrade quietly
         }
         PracticeBotAi.Mode restored = saved;
+        Protection savedProtection;
+        try {
+            savedProtection = Protection.valueOf(state.protection);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            // Unknown/renamed value, or a state file written before armour was selectable.
+            savedProtection = Protection.PROTECTION;
+        }
+        Protection restoredProtection = savedProtection;
         float yaw = state.yaw;
 
-        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, restored,
+        server.execute(() -> performSummon(server, dimension, real, spawnPos, yaw, restored, restoredProtection,
                 () -> pendingRestoreNotice = restored,
                 error -> { /* nothing to report an error to here either */ }));
     }
 
     /** Actual entity creation/equip/positioning, shared by the command path and the world-load restore path. Must run inside server.execute(...). */
     private static void performSummon(MinecraftServer server, ResourceKey<Level> dimension, GameProfile real,
-                                       Vec3 spawnPos, float yaw, PracticeBotAi.Mode requested,
+                                       Vec3 spawnPos, float yaw, PracticeBotAi.Mode requested, Protection protection,
                                        Runnable onSuccess, Consumer<Component> onError) {
         ServerLevel level = server.getLevel(dimension);
         if (level == null) {
@@ -321,23 +442,7 @@ public final class PracticeBotManager {
         boolean alreadyTracked = level.getEntity(currentBotUuid) != null;
 
         RegistryAccess registries = level.registryAccess();
-        newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET));
-        newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS));
-        newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS));
-        newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE));
-        // Shield mode blocks with the shield in the MAIN hand, so the offhand is free to
-        // permanently hold a totem -- which is exactly how a real crystal PvP player is
-        // kitted (sword + totem), and is what lets the bot survive by popping totems
-        // instead of being handed artificial damage immunity. Shield mode never attacks,
-        // so it loses nothing by not holding the sword.
-        if (requested == PracticeBotAi.Mode.SHIELD) {
-            newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.SHIELD,
-                    new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
-        } else {
-            newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
-                    new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
-        }
-        newBot.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.TOTEM_OF_UNDYING));
+        equipDummyKit(newBot, registries, requested, protection);
 
         newBot.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
         newBot.setYRot(yaw);
@@ -386,7 +491,10 @@ public final class PracticeBotManager {
                         NO_KNOCKBACK_RESISTANCE, 1.0, AttributeModifier.Operation.ADD_VALUE));
             }
         }
-        newBot.setCustomName(Component.literal(real.name() + "'s Practice Bot"));
+        baseName = real.name() + "'s Practice Bot";
+        shownHealth = Integer.MIN_VALUE; // force the tag to rebuild for the new bot
+        shownAbsorption = Integer.MIN_VALUE;
+        refreshHealthTag(newBot);
         newBot.setCustomNameVisible(true);
 
         // Always re-send the player-info: a client with no tab-list entry for this UUID
@@ -440,9 +548,34 @@ public final class PracticeBotManager {
         return 1;
     }
 
-    private static ItemStack armor(RegistryAccess registries, Item item) {
+    /**
+     * The original dummy kit: full enchanted netherite plus a totem, for the modes that stand
+     * there and take it.
+     */
+    private static void equipDummyKit(FakePlayer newBot, RegistryAccess registries,
+                                      PracticeBotAi.Mode requested, Protection protection) {
+        newBot.setItemSlot(EquipmentSlot.HEAD, armor(registries, Items.NETHERITE_HELMET, protection));
+        newBot.setItemSlot(EquipmentSlot.LEGS, armor(registries, Items.NETHERITE_LEGGINGS, protection));
+        newBot.setItemSlot(EquipmentSlot.FEET, armor(registries, Items.NETHERITE_BOOTS, protection));
+        newBot.setItemSlot(EquipmentSlot.CHEST, armor(registries, Items.NETHERITE_CHESTPLATE, protection));
+        // Shield mode blocks with the shield in the MAIN hand, so the offhand is free to
+        // permanently hold a totem -- which is exactly how a real crystal PvP player is
+        // kitted (sword + totem), and is what lets the bot survive by popping totems
+        // instead of being handed artificial damage immunity. Shield mode never attacks,
+        // so it loses nothing by not holding the sword.
+        if (requested == PracticeBotAi.Mode.SHIELD) {
+            newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.SHIELD,
+                    new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
+        } else {
+            newBot.setItemSlot(EquipmentSlot.MAINHAND, gear(registries, Items.NETHERITE_SWORD,
+                    new Ench(Enchantments.SHARPNESS, 5), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1)));
+        }
+        newBot.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.TOTEM_OF_UNDYING));
+    }
+
+    private static ItemStack armor(RegistryAccess registries, Item item, Protection protection) {
         return gear(registries, item,
-                new Ench(Enchantments.PROTECTION, 4), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1));
+                new Ench(protection.enchantment, 4), new Ench(Enchantments.UNBREAKING, 3), new Ench(Enchantments.MENDING, 1));
     }
 
     private record Ench(ResourceKey<Enchantment> key, int level) {
@@ -457,6 +590,12 @@ public final class PracticeBotManager {
             mutable.set(holder, e.level());
         }
         stack.set(DataComponents.ENCHANTMENTS, mutable.toImmutable());
+        // Truly unbreakable, not just Unbreaking III: the bot's kit takes damage every single
+        // exchange and is never repaired by anything (Mending needs XP orbs, which a FakePlayer
+        // never collects), so armour WOULD eventually break mid-session and quietly change what
+        // you're practising against. In 26.2 this component is typed DataComponentType<Unit> --
+        // not the older record with a showInTooltip flag -- verified via javap.
+        stack.set(DataComponents.UNBREAKABLE, Unit.INSTANCE);
         return stack;
     }
 }

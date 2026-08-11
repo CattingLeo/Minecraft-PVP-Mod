@@ -29,6 +29,8 @@ public class PracticeBotState {
     public boolean active = false;
     /** PracticeBotAi.Mode name(); string rather than the enum so an unknown/renamed value degrades to IDLE instead of breaking the whole file. */
     public String mode = "IDLE";
+    /** PracticeBotManager.Protection name(); same reasoning, and a file written before armour was selectable simply has no value here. */
+    public String protection = "PROTECTION";
     public String dimension = "minecraft:overworld";
     public double x;
     public double y;

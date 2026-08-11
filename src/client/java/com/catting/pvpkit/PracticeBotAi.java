@@ -6,6 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -62,9 +63,12 @@ public final class PracticeBotAi {
     }
 
     public static void tick(FakePlayer bot, Mode mode, ServerLevel level) {
-        restockTotem(bot);
+        keepFed(bot);
+        PracticeBotManager.refreshHealthTag(bot);
 
         Player target = nearestRealPlayer(bot, level);
+        restockTotem(bot);
+
         if (target != null) {
             // Vanilla only blocks damage arriving from roughly the entity's front, so SHIELD
             // needs this as much as the moving modes do.
@@ -151,6 +155,35 @@ public final class PracticeBotAi {
         if (!bot.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) {
             bot.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.TOTEM_OF_UNDYING));
         }
+    }
+
+    /**
+     * Food level that neither starves the bot nor lets it quietly heal.
+     *
+     * Vanilla only regenerates health at food >= 18, and only starves at food == 0, so anything
+     * in between is the dead zone this wants. 10 sits squarely in it.
+     */
+    private static final int FED_LEVEL = 10;
+
+    /**
+     * THE reason the bot appeared to "randomly take damage all the time", in every mode.
+     *
+     * The bot runs the real ServerPlayer tick (see FakePlayerTickMixin), and that includes
+     * ServerPlayer#doTick's `foodData.tick(this)`. It never eats, and every hit it takes runs
+     * Player#causeFoodExhaustion -- so the more you practise on it, the faster its food drains,
+     * until it hits zero and vanilla starves it on a timer forever after. That damage arrives
+     * with no attacker and no hit reaction, which also made SHIELD mode look broken: the bot
+     * was blocking correctly, but its health kept falling anyway.
+     *
+     * Pinned rather than topped up, and pinned BELOW the regeneration threshold on purpose.
+     * Setting it to a full 20 with saturation would hand the bot passive healing, which is
+     * exactly the "hits don't feel like they land" problem the Resistance/Regeneration effects
+     * were stripped to avoid.
+     */
+    private static void keepFed(FakePlayer bot) {
+        FoodData food = bot.getFoodData();
+        if (food.getFoodLevel() != FED_LEVEL) food.setFoodLevel(FED_LEVEL);
+        if (food.getSaturationLevel() != 0.0f) food.setSaturation(0.0f);
     }
 
     /** Nearest real player, excluding the bot itself (it lives in level.players() too). */

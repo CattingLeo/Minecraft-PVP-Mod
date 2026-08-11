@@ -1,38 +1,39 @@
 package com.catting.pvpkit;
 
-import java.util.EnumMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 /**
- * Right Shift opens this: a client-style module panel in the top-right corner -- a search
- * box over collapsible Combat / Render / Player / Movement / Misc sections, one click per
- * module to toggle it. Sub-settings (sliders, positions, per-ore Xray, enum pickers) stay in
- * Mod Menu -> .PVP KIT, which is the screen built for them; what belongs here is defined by
- * ModuleRegistry.
+ * Right Shift opens this: a client-style module GUI -- one small panel per category laid out
+ * ACROSS the screen, each one independently draggable and collapsible, plus a Search panel.
+ * Click a module to toggle it. Doesn't pause the game.
  *
- * Doesn't pause the game (isPauseScreen() false) and shows the world behind it
- * (extractTransparentBackground) instead of the usual dark/blurred menu background, so it
- * reads as a lightweight overlay rather than a full pause screen.
+ * Deliberately NOT one tall column: the panels are separate windows you arrange yourself
+ * (Meteor/LiquidBounce style), and their positions persist in config/pvpkit-modulehud.json via
+ * ModuleHudLayout. Sub-settings (sliders, HUD position, per-ore Xray, enum pickers) stay in
+ * Mod Menu -> .PVP KIT; what belongs here is defined by ModuleRegistry.
  *
  * RENDERING NOTES for this MC version, all verified via javap -- guessing here is what caused
  * previous compile errors in this project:
  *   - Screen has no render() to override; drawing goes through extractRenderState(...), and
- *     Screen's own implementation ONLY iterates the widget list (checked in its bytecode). So
+ *     Screen's own implementation ONLY iterates the widget list (checked in its bytecode), so
  *     panel chrome is drawn first and super.extractRenderState() puts the widgets on top.
- *   - Rows are AbstractWidget subclasses (ModuleRowWidget / ModuleCategoryWidget) rather than
- *     hand-rolled hit-testing, so Screen handles click dispatch and hover for free.
+ *   - Rows are AbstractWidget subclasses, so Screen handles click dispatch, hover, focus and
+ *     the drag routing (AbstractContainerEventHandler forwards drags to the pressed child).
  *   - Minecraft has no public screen field/setScreen; opening and closing goes through
  *     Minecraft#gui.screen()/setScreen(Screen) -- see PvpKitKeybinds.
  *
- * Search and expansion state are static so they survive closing and reopening the panel:
- * re-collapsing every section on each open would make the whole thing tedious in a fight.
+ * Dragging moves widgets in place with setX/setY rather than rebuilding: rebuilding mid-drag
+ * would replace the very widget the drag is being routed to and the panel would stick.
  */
 public class ModuleListScreen extends Screen {
 
@@ -48,122 +49,206 @@ public class ModuleListScreen extends Screen {
     static final int TEXT_FAINT = 0xFF6A6A78;
 
     // --- metrics ---
-    static final int PAD = 6;
-    static final int ROW_INDENT = 14;
-    private static final int PANEL_W = 174;
-    private static final int ROW_H = 14;
-    private static final int TITLE_H = 18;
-    private static final int SEARCH_H = 14;
-    private static final int MARGIN = 6;
+    static final int PAD = 5;
+    static final int ROW_INDENT = 13;
+    private static final int PANEL_W = 116;
+    private static final int ROW_H = 13;
+    private static final int HEADER_H = 15;
+    private static final int GAP = 5;
+    private static final int MARGIN = 5;
 
-    /** Kept across opens -- see class javadoc. */
-    private static final Map<ModuleRegistry.Category, Boolean> EXPANDED =
-            new EnumMap<>(ModuleRegistry.Category.class);
+    private static final String SEARCH_KEY = "search";
+
     private static String search = "";
-    private static int scroll;
+
+    /** Panel key -> the widgets that move with it, so a drag can shift the whole panel. */
+    private final Map<String, List<AbstractWidget>> panelWidgets = new LinkedHashMap<>();
+    /** Panel key -> {x, y, width, height} for the chrome drawn behind those widgets. */
+    private final Map<String, int[]> panelBounds = new LinkedHashMap<>();
 
     private EditBox searchBox;
-    private int panelX;
-    private int panelHeight;
-    private int listTop;
-    private int listHeight;
+
+    /**
+     * Rebuilds are deferred to the next tick rather than run inline. Both triggers (the search
+     * responder and a header toggle) fire from inside event dispatch, which is iterating the
+     * very widget list rebuildWidgets() clears -- doing it inline risks mutating that list
+     * mid-iteration.
+     */
+    private boolean rebuildQueued;
+
+    /**
+     * Sub-pixel drag carry. Drag deltas arrive as doubles and a slow drag is a stream of values
+     * below 1, so rounding each one on its own would floor them all to zero and the panel would
+     * refuse to move until you yanked it.
+     */
+    private String draggingKey;
+    private double residualX;
+    private double residualY;
 
     public ModuleListScreen() {
         super(Component.literal("Modules"));
     }
 
-    private static boolean expanded(ModuleRegistry.Category category) {
-        return EXPANDED.getOrDefault(category, Boolean.FALSE);
+    @Override
+    public void tick() {
+        super.tick();
+        if (rebuildQueued) {
+            rebuildQueued = false;
+            rebuildWidgets();
+        }
     }
 
     @Override
     protected void init() {
-        panelX = this.width - PANEL_W - MARGIN;
-        listTop = MARGIN + TITLE_H + SEARCH_H + PAD;
+        panelWidgets.clear();
+        panelBounds.clear();
 
-        searchBox = new EditBox(this.font, panelX + PAD, MARGIN + TITLE_H,
-                PANEL_W - PAD * 2, SEARCH_H, Component.literal("Search"));
-        searchBox.setHint(Component.literal("Search..."));
-        searchBox.setMaxLength(32);
-        searchBox.setBordered(false);
-        searchBox.setTextColor(TEXT);
-        searchBox.setValue(search);
-        searchBox.setResponder(value -> {
-            if (value.equals(search)) return;
-            search = value;
-            scroll = 0; // a new filter with the old offset can land you past the end of the list
-            rebuildWidgets();
-        });
-        addRenderableWidget(searchBox);
-        // Focused on open so you can just type, the way a client's search behaves. EditBox
-        // doesn't consume Escape, so Escape still closes the panel (same as the creative
-        // inventory's search field).
-        setFocused(searchBox);
-        searchBox.setFocused(true);
-
-        // Lay the sections out into a flat row list first, so culling and scrolling only ever
-        // deal with "row N of M" rather than the section structure.
-        List<Runnable> rows = new java.util.ArrayList<>();
-        boolean searching = !search.isBlank();
+        placeDefaults();
+        buildSearchPanel();
         for (ModuleRegistry.Category category : ModuleRegistry.Category.values()) {
-            List<ModuleRegistry.Module> matches = ModuleRegistry.inCategory(category, search);
-            if (matches.isEmpty()) continue; // hide sections with nothing to show while searching
+            buildCategoryPanel(category);
+        }
+    }
 
-            final int index = rows.size();
-            final boolean open = searching || expanded(category);
-            rows.add(placeholder(index, y -> addRenderableWidget(new ModuleCategoryWidget(
-                    panelX, y, PANEL_W, ROW_H, category, matches.size(), open, () -> {
-                        EXPANDED.put(category, !expanded(category));
-                        rebuildWidgets();
-                    }))));
+    /**
+     * First-run placement: the panels flow left to right across the top and wrap when they'd
+     * run off the edge, so the default really is a horizontal bar rather than a column. Only
+     * applied to panels the user has never dragged (placed=false).
+     */
+    private void placeDefaults() {
+        int x = MARGIN;
+        int y = MARGIN;
+        List<String> keys = new ArrayList<>();
+        keys.add(SEARCH_KEY);
+        for (ModuleRegistry.Category category : ModuleRegistry.Category.values()) keys.add(category.name());
 
-            if (!open) continue;
+        for (String key : keys) {
+            ModuleHudLayout.Panel panel = ModuleHudLayout.panel(key);
+            if (x + PANEL_W > this.width - MARGIN && x > MARGIN) {
+                x = MARGIN;
+                y += HEADER_H + GAP;
+            }
+            if (!panel.placed) {
+                panel.x = x;
+                panel.y = y;
+                panel.placed = true;
+            }
+            x += PANEL_W + GAP;
+        }
+    }
+
+    private void buildSearchPanel() {
+        ModuleHudLayout.Panel panel = clamped(SEARCH_KEY);
+        List<AbstractWidget> widgets = new ArrayList<>();
+
+        widgets.add(addRenderableWidget(header(SEARCH_KEY, panel, "Search",
+                () -> enabledCount() + "/" + ModuleRegistry.all().size(), false)));
+
+        int height = HEADER_H;
+        if (panel.expanded) {
+            searchBox = new EditBox(this.font, panel.x + PAD, panel.y + HEADER_H + 2,
+                    PANEL_W - PAD * 2, ROW_H, Component.literal("Search"));
+            searchBox.setHint(Component.literal("Search..."));
+            searchBox.setMaxLength(32);
+            searchBox.setBordered(false);
+            searchBox.setTextColor(TEXT);
+            searchBox.setValue(search);
+            searchBox.setResponder(value -> {
+                if (value.equals(search)) return;
+                search = value;
+                rebuildQueued = true;
+            });
+            widgets.add(addRenderableWidget(searchBox));
+            // Focused on open so you can just type. EditBox doesn't consume Escape, so Escape
+            // still closes the screen (same as the creative inventory's search field).
+            setFocused(searchBox);
+            searchBox.setFocused(true);
+            height += ROW_H + 4;
+        }
+
+        panelWidgets.put(SEARCH_KEY, widgets);
+        panelBounds.put(SEARCH_KEY, new int[]{panel.x, panel.y, PANEL_W, height});
+    }
+
+    private void buildCategoryPanel(ModuleRegistry.Category category) {
+        List<ModuleRegistry.Module> matches = ModuleRegistry.inCategory(category, search);
+        if (matches.isEmpty()) return; // nothing to show for the current filter
+
+        String key = category.name();
+        ModuleHudLayout.Panel panel = clamped(key);
+        List<AbstractWidget> widgets = new ArrayList<>();
+
+        boolean open = panel.expanded || !search.isBlank();
+        String count = String.valueOf(matches.size());
+        widgets.add(addRenderableWidget(header(key, panel, category.label, () -> count, true)));
+
+        int height = HEADER_H;
+        if (open) {
+            int y = panel.y + HEADER_H;
             for (ModuleRegistry.Module module : matches) {
-                final int rowIndex = rows.size();
-                rows.add(placeholder(rowIndex, y -> addRenderableWidget(
-                        new ModuleRowWidget(panelX, y, PANEL_W, ROW_H, module))));
+                widgets.add(addRenderableWidget(new ModuleRowWidget(panel.x, y, PANEL_W, ROW_H, module)));
+                y += ROW_H;
             }
+            height += matches.size() * ROW_H;
         }
 
-        int contentHeight = rows.size() * ROW_H;
-        int available = this.height - listTop - MARGIN;
-        // An empty result still needs a row's worth of space for the "No modules match" line.
-        listHeight = contentHeight == 0 ? ROW_H : Math.min(contentHeight, Math.max(ROW_H, available));
-        scroll = Mth.clamp(scroll, 0, Math.max(0, contentHeight - listHeight));
-        panelHeight = listTop - MARGIN + listHeight + PAD;
+        panelWidgets.put(key, widgets);
+        panelBounds.put(key, new int[]{panel.x, panel.y, PANEL_W, height});
+    }
 
-        // Only build widgets that are actually on screen. That's what keeps scrolling correct
-        // without a scissor: clipping the widget pass would clip the search box with it, since
-        // Screen draws every widget in one go.
-        for (int i = 0; i < rows.size(); i++) {
-            int y = listTop - scroll + i * ROW_H;
-            if (y + ROW_H <= listTop || y >= listTop + listHeight) continue;
-            rows.get(i).run();
+    private ModuleCategoryWidget header(String key, ModuleHudLayout.Panel panel, String title,
+                                        java.util.function.Supplier<String> trailing, boolean showArrow) {
+        boolean open = panel.expanded || (showArrow && !search.isBlank());
+        return new ModuleCategoryWidget(panel.x, panel.y, PANEL_W, HEADER_H, title, trailing,
+                open, showArrow,
+                () -> {
+                    panel.expanded = !panel.expanded;
+                    ModuleHudLayout.save();
+                    rebuildQueued = true;
+                },
+                (dx, dy) -> movePanel(key, panel, dx, dy),
+                ModuleHudLayout::save);
+    }
+
+    /** Shifts a panel and everything in it, keeping it on screen. */
+    private void movePanel(String key, ModuleHudLayout.Panel panel, double dx, double dy) {
+        int[] bounds = panelBounds.get(key);
+        if (bounds == null) return;
+
+        if (!key.equals(draggingKey)) { // a new drag starts with no leftover carry
+            draggingKey = key;
+            residualX = 0.0;
+            residualY = 0.0;
+        }
+        residualX += dx;
+        residualY += dy;
+        int stepX = (int) residualX;
+        int stepY = (int) residualY;
+        residualX -= stepX;
+        residualY -= stepY;
+
+        int nextX = Mth.clamp(panel.x + stepX, 0, Math.max(0, this.width - PANEL_W));
+        int nextY = Mth.clamp(panel.y + stepY, 0, Math.max(0, this.height - HEADER_H));
+        int shiftX = nextX - panel.x;
+        int shiftY = nextY - panel.y;
+        if (shiftX == 0 && shiftY == 0) return;
+
+        panel.x = nextX;
+        panel.y = nextY;
+        bounds[0] = nextX;
+        bounds[1] = nextY;
+        for (AbstractWidget widget : panelWidgets.getOrDefault(key, List.of())) {
+            widget.setX(widget.getX() + shiftX);
+            widget.setY(widget.getY() + shiftY);
         }
     }
 
-    private interface RowPlacer {
-        void place(int y);
-    }
-
-    /** Defers one row's widget creation until its final Y is known (after scroll is clamped). */
-    private Runnable placeholder(int index, RowPlacer placer) {
-        return () -> placer.place(listTop - scroll + index * ROW_H);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
-        int contentHeight = totalRows() * ROW_H;
-        if (contentHeight > listHeight) {
-            int max = contentHeight - listHeight;
-            int next = Mth.clamp(scroll - (int) (deltaY * ROW_H), 0, max);
-            if (next != scroll) {
-                scroll = next;
-                rebuildWidgets();
-            }
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+    /** Pulls a stored panel back on screen -- a saved layout can outlive the window size it was made at. */
+    private ModuleHudLayout.Panel clamped(String key) {
+        ModuleHudLayout.Panel panel = ModuleHudLayout.panel(key);
+        panel.x = Mth.clamp(panel.x, 0, Math.max(0, this.width - PANEL_W));
+        panel.y = Mth.clamp(panel.y, 0, Math.max(0, this.height - HEADER_H));
+        return panel;
     }
 
     private static int enabledCount() {
@@ -174,46 +259,28 @@ public class ModuleListScreen extends Screen {
         return enabled;
     }
 
-    /** Row count for the current filter/expansion -- headers plus the modules of open sections. */
-    private int totalRows() {
-        int rows = 0;
-        boolean searching = !search.isBlank();
-        for (ModuleRegistry.Category category : ModuleRegistry.Category.values()) {
-            List<ModuleRegistry.Module> matches = ModuleRegistry.inCategory(category, search);
-            if (matches.isEmpty()) continue;
-            rows++;
-            if (searching || expanded(category)) rows += matches.size();
-        }
-        return rows;
-    }
-
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        int top = MARGIN;
-        int right = panelX + PANEL_W;
-        int bottom = top + panelHeight;
-
-        graphics.fill(panelX, top, right, bottom, PANEL_BG);
-        graphics.outline(panelX, top, PANEL_W, panelHeight, PANEL_EDGE);
-        graphics.fill(panelX, top, right, top + 2, ACCENT); // accent strip along the top
-
-        graphics.text(this.font, "PVP KIT", panelX + PAD, top + 7, TEXT, false);
-        // Enabled/total, so the panel is worth a glance even with every section collapsed.
-        String tally = enabledCount() + "/" + ModuleRegistry.all().size();
-        graphics.text(this.font, tally, right - PAD - this.font.width(tally), top + 7, TEXT_FAINT, false);
-        graphics.fill(panelX + PAD, MARGIN + TITLE_H + SEARCH_H - 1,
-                right - PAD, MARGIN + TITLE_H + SEARCH_H, PANEL_EDGE); // underline under the search box
-
-        if (totalRows() == 0) {
-            graphics.text(this.font, "No modules match", panelX + ROW_INDENT, listTop + 4, TEXT_FAINT, false);
+        for (int[] bounds : panelBounds.values()) {
+            int x = bounds[0];
+            int y = bounds[1];
+            int right = x + bounds[2];
+            int bottom = y + bounds[3];
+            graphics.fill(x, y, right, bottom, PANEL_BG);
+            graphics.outline(x, y, bounds[2], bounds[3], PANEL_EDGE);
         }
-
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         extractTransparentBackground(graphics);
+    }
+
+    @Override
+    public void onClose() {
+        ModuleHudLayout.save();
+        super.onClose();
     }
 
     @Override
